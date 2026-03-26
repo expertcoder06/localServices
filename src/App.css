@@ -1300,6 +1300,10 @@
   height: 100vh;
 }
 
+.dashboard-sidebar .navbar__logo {
+  color: var(--primary);
+}
+
 .dashboard-nav {
   display: flex;
   flex-direction: column;
