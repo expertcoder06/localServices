@@ -383,7 +383,7 @@
   font-family: var(--font-body);
   padding: 0.4rem 0;
 }
-.hero__search-input::placeholder { color: rgba(255,255,255,0.5); }
+.hero__search-input::placeholder { color: transperent; }
 
 .hero__search-select {
   background: rgba(255,255,255,0.1);
