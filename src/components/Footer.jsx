@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 const footerLinks = {
   Company: ['About', 'Careers', 'Impact', 'Newsroom'],
   Support: ['Contact', 'FAQ', 'Safety', 'Trust & Security'],
@@ -40,9 +42,17 @@ export default function Footer() {
           ))}
         </div>
 
-        <div className="footer__bottom">
-          <p>© 2024 LOCAL-SERVICES. The Digital Architect.</p>
-          <p className="footer__bottom-sub">All rights reserved. Designed with precision.</p>
+        <div className="footer__bottom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <p>© 2024 LOCAL-SERVICES. The Digital Architect.</p>
+            <p className="footer__bottom-sub">All rights reserved. Designed with precision.</p>
+          </div>
+          <div>
+            <Link to="/admin" className="btn btn--outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+              <span className="material-icons" style={{ fontSize: '1rem' }}>admin_panel_settings</span>
+              Admin
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
