@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import AiBiddingSystem from '../components/AiBiddingSystem'
+import JobExecutionWallet from '../components/JobExecutionWallet'
 import '../App.css'
 
 const MOCK_REQUESTS = [
@@ -55,6 +56,10 @@ const MOCK_REQUESTS = [
     urgency: 'Tomorrow',
     postedAt: '1h ago',
     address: 'Sushant Lok, Gurgaon',
+    description: 'Detailed description of the service requested by the user. Need a comprehensive AC servicing and gas refill for a 1.5 ton split AC. The cooling has significantly decreased recently.',
+    customerName: 'Ankit Mehta',
+    date: '27th March 2026',
+    time: '10:00 AM - 12:00 PM',
   },
 ]
 
@@ -77,6 +82,8 @@ export default function ProviderDashboard() {
   const [isActive, setIsActive] = useState(true)
   const [acceptedJobs, setAcceptedJobs] = useState(new Set())
   const [declinedJobs, setDeclinedJobs] = useState(new Set())
+  const [selectedRequest, setSelectedRequest] = useState(null)
+  const [activeJob, setActiveJob] = useState(null)
 
   const visibleRequests = MOCK_REQUESTS.filter(r => !declinedJobs.has(r.id))
 
@@ -205,15 +212,22 @@ export default function ProviderDashboard() {
           </div>
         </header>
 
+        {/* Job Execution View */}
+        {activeJob && (
+          <div style={{ padding: '1rem' }}>
+            <JobExecutionWallet job={activeJob} onBack={() => setActiveJob(null)} />
+          </div>
+        )}
+
         {/* AI Bidding System — Jobs Tab */}
-        {activeTab === 'jobs' && (
+        {!activeJob && activeTab === 'jobs' && (
           <div style={{ padding: '0 0.5rem' }}>
             <AiBiddingSystem />
           </div>
         )}
 
         {/* Grid — Dashboard Tab */}
-        {activeTab !== 'jobs' && (<div className="dashboard-grid">
+        {!activeJob && activeTab !== 'jobs' && (<div className="dashboard-grid">
           {/* Left Column */}
           <div className="dashboard-col-left">
 
@@ -231,14 +245,20 @@ export default function ProviderDashboard() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {visibleRequests.map(req => (
-                  <div key={req.id} style={{
+                  <div key={req.id} 
+                    onClick={() => setSelectedRequest(req)}
+                    style={{
                     background: '#fff',
                     borderRadius: 'var(--radius-lg)',
                     padding: '1.2rem 1.5rem',
                     border: '1px solid var(--outline-variant)',
                     boxShadow: 'var(--shadow-sm)',
-                    transition: 'box-shadow 0.2s',
-                  }}>
+                    transition: 'all 0.2s',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow-md)'}
+                  onMouseLeave={e => e.currentTarget.style.boxShadow = 'var(--shadow-sm)'}
+                  >
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
                       <div style={{
                         width: '44px', height: '44px', borderRadius: 'var(--radius-md)', flexShrink: 0,
@@ -270,14 +290,21 @@ export default function ProviderDashboard() {
                             <button
                               className="btn btn--ghost"
                               style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem', border: '1px solid var(--outline-variant)' }}
-                              onClick={() => setDeclinedJobs(prev => new Set([...prev, req.id]))}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeclinedJobs(prev => new Set([...prev, req.id]))
+                              }}
                             >Decline</button>
                             <button
                               className="btn btn--primary"
                               style={{ padding: '0.3rem 0.9rem', fontSize: '0.75rem', opacity: acceptedJobs.has(req.id) ? 0.7 : 1 }}
-                              onClick={() => setAcceptedJobs(prev => new Set([...prev, req.id]))}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAcceptedJobs(prev => new Set([...prev, req.id]))
+                                setActiveJob(req)
+                              }}
                             >
-                              {acceptedJobs.has(req.id) ? '✓ Accepted' : 'Accept Job'}
+                              {acceptedJobs.has(req.id) ? '✓ Bid Placed' : 'Place Bid'}
                             </button>
                           </div>
                         </div>
@@ -429,6 +456,104 @@ export default function ProviderDashboard() {
           </div>
         </div>)}
       </main>
+
+      {/* Request Details Modal */}
+      {selectedRequest && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,32,69,0.6)',
+          backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex',
+          alignItems: 'center', justifyContent: 'center', padding: '1.5rem'
+        }} onClick={() => setSelectedRequest(null)}>
+          <div style={{
+            background: 'white', borderSelf: '1px solid var(--outline-variant)',
+            borderRadius: 'var(--radius-xl)', width: '100%', maxWidth: '600px',
+            maxHeight: '90vh', overflowY: 'auto', position: 'relative',
+            animation: 'modalSlideUp 0.3s ease-out',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div style={{
+                    width: '56px', height: '56px', borderRadius: 'var(--radius-lg)',
+                    background: `color-mix(in srgb, ${selectedRequest.color} 14%, transparent)`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span className="material-icons" style={{ color: selectedRequest.color, fontSize: '1.8rem' }}>{selectedRequest.icon}</span>
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{selectedRequest.title}</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>{selectedRequest.category}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedRequest(null)}
+                  style={{ background: 'var(--surface-container)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <span className="material-icons" style={{ fontSize: '1.2rem', color: 'var(--on-surface-variant)' }}>close</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+                <div style={{ background: 'var(--surface-container-low)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, marginBottom: '0.4rem' }}>Budget Range</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{selectedRequest.budgetMin} - ₹{selectedRequest.budgetMax}</div>
+                </div>
+                <div style={{ background: 'var(--surface-container-low)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, marginBottom: '0.4rem' }}>Urgency</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: selectedRequest.urgency === 'Urgent' ? '#e53e3e' : '#38a169' }}>{selectedRequest.urgency}</div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '2rem' }}>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span className="material-icons" style={{ fontSize: '1.2rem', color: 'var(--primary)' }}>description</span>
+                  Job Description
+                </h4>
+                <p style={{ fontSize: '0.9rem', color: 'var(--on-surface-variant)', lineHeight: 1.6, background: 'var(--surface-container-lowest)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--outline-variant)' }}>
+                  {selectedRequest.description || "The user needs professional assistance with their request. Please click 'Place Bid' to offer your services and discuss further details."}
+                </p>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--on-surface)', marginBottom: '0.5rem' }}>Location</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>
+                    <span className="material-icons" style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>location_on</span>
+                    {selectedRequest.address}
+                  </div>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--on-surface)', marginBottom: '0.5rem' }}>Preferred Time</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>
+                    <span className="material-icons" style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>schedule</span>
+                    27th March, 10 AM - 12 PM
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button 
+                  className="btn btn--ghost" 
+                  style={{ flex: 1, padding: '1rem' }}
+                  onClick={() => setSelectedRequest(null)}
+                >Close</button>
+                <button 
+                  className="btn btn--primary" 
+                  style={{ flex: 2, padding: '1rem', fontSize: '1rem' }}
+                  onClick={() => {
+                    setAcceptedJobs(prev => new Set([...prev, selectedRequest.id]))
+                    setActiveJob(selectedRequest)
+                    setSelectedRequest(null)
+                  }}
+                >
+                  {acceptedJobs.has(selectedRequest.id) ? 'Bid Already Placed' : 'Place Bid Now'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
