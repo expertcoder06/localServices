@@ -19,14 +19,17 @@ export default function Chatbot() {
     injectScript.id = 'bp-inject'
     injectScript.src = BOTPRESS_INJECT_URL
     injectScript.async = true
+    
+    injectScript.onload = () => {
+      // 2. Inject the bot-specific configuration after runtime is loaded
+      const configScript = document.createElement('script')
+      configScript.id = 'bp-config'
+      configScript.src = BOTPRESS_CONFIG_URL
+      configScript.defer = true
+      document.body.appendChild(configScript)
+    }
+    
     document.body.appendChild(injectScript)
-
-    // 2. Inject the bot-specific configuration (defer mirrors the original snippet)
-    const configScript = document.createElement('script')
-    configScript.id = 'bp-config'
-    configScript.src = BOTPRESS_CONFIG_URL
-    configScript.defer = true
-    document.body.appendChild(configScript)
 
     // --- Cleanup on unmount (HMR / route tear-down) ---
     return () => {
