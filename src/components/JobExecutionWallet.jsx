@@ -43,7 +43,7 @@ export default function JobExecutionWallet({ job, onBack }) {
   const timer = useTimer()
   const [checklist, setChecklist] = useState(CHECKLIST)
   const [walletBalance] = useState(34450)
-  const [pendingEarning] = useState(job?.budgetMin ?? 800)
+  const [pendingEarning] = useState(job?.bidPrice ?? job?.budgetMin ?? 800)
 
   const doneCount = checklist.filter(c => c.done).length
   const progress = Math.round((doneCount / checklist.length) * 100)
@@ -74,7 +74,7 @@ export default function JobExecutionWallet({ job, onBack }) {
             <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>{job?.title ?? 'Smart Home System Installation'}</h2>
             <p style={{ fontSize: '0.78rem', color: 'var(--on-surface-variant)' }}>
               <span className="material-icons" style={{ fontSize: '0.8rem', verticalAlign: 'middle', marginRight: '2px' }}>location_on</span>
-              {job?.address ?? 'Sector 21, Gurgaon'} · Bid: ₹{(job?.budgetMin ?? 800).toLocaleString()}
+              {job?.address ?? 'Sector 21, Gurgaon'} · Bid: ₹{(job?.bidPrice ?? job?.budgetMin ?? 800).toLocaleString()}
             </p>
           </div>
           <div style={{

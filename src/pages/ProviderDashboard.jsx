@@ -84,6 +84,8 @@ export default function ProviderDashboard() {
   const [declinedJobs, setDeclinedJobs] = useState(new Set())
   const [selectedRequest, setSelectedRequest] = useState(null)
   const [activeJob, setActiveJob] = useState(null)
+  const [isPriceStep, setIsPriceStep] = useState(false)
+  const [currentBidPrice, setCurrentBidPrice] = useState(0)
 
   const visibleRequests = MOCK_REQUESTS.filter(r => !declinedJobs.has(r.id))
 
@@ -300,8 +302,9 @@ export default function ProviderDashboard() {
                               style={{ padding: '0.3rem 0.9rem', fontSize: '0.75rem', opacity: acceptedJobs.has(req.id) ? 0.7 : 1 }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setAcceptedJobs(prev => new Set([...prev, req.id]))
-                                setActiveJob(req)
+                                setSelectedRequest(req)
+                                setIsPriceStep(true)
+                                setCurrentBidPrice(Math.round((req.budgetMin + req.budgetMax) / 2))
                               }}
                             >
                               {acceptedJobs.has(req.id) ? '✓ Bid Placed' : 'Place Bid'}
@@ -463,7 +466,7 @@ export default function ProviderDashboard() {
           position: 'fixed', inset: 0, background: 'rgba(0,32,69,0.6)',
           backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex',
           alignItems: 'center', justifyContent: 'center', padding: '1.5rem'
-        }} onClick={() => setSelectedRequest(null)}>
+        }} onClick={() => { setSelectedRequest(null); setIsPriceStep(false); }}>
           <div style={{
             background: 'white', borderSelf: '1px solid var(--outline-variant)',
             borderRadius: 'var(--radius-xl)', width: '100%', maxWidth: '600px',
@@ -474,82 +477,140 @@ export default function ProviderDashboard() {
             <div style={{ padding: '2rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <div style={{
-                    width: '56px', height: '56px', borderRadius: 'var(--radius-lg)',
-                    background: `color-mix(in srgb, ${selectedRequest.color} 14%, transparent)`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <span className="material-icons" style={{ color: selectedRequest.color, fontSize: '1.8rem' }}>{selectedRequest.icon}</span>
-                  </div>
+                  {!isPriceStep ? (
+                    <div style={{
+                      width: '56px', height: '56px', borderRadius: 'var(--radius-lg)',
+                      background: `color-mix(in srgb, ${selectedRequest.color} 14%, transparent)`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span className="material-icons" style={{ color: selectedRequest.color, fontSize: '1.8rem' }}>{selectedRequest.icon}</span>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => setIsPriceStep(false)}
+                      style={{ background: 'var(--surface-container)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <span className="material-icons" style={{ fontSize: '1.2rem', color: 'var(--on-surface-variant)' }}>arrow_back</span>
+                    </button>
+                  )}
                   <div>
-                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{selectedRequest.title}</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>{selectedRequest.category}</p>
+                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{isPriceStep ? 'Set Your Price' : selectedRequest.title}</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>{isPriceStep ? `Customer Budget: ₹${selectedRequest.budgetMin} - ₹${selectedRequest.budgetMax}` : selectedRequest.category}</p>
                   </div>
                 </div>
                 <button 
-                  onClick={() => setSelectedRequest(null)}
+                  onClick={() => { setSelectedRequest(null); setIsPriceStep(false); }}
                   style={{ background: 'var(--surface-container)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   <span className="material-icons" style={{ fontSize: '1.2rem', color: 'var(--on-surface-variant)' }}>close</span>
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
-                <div style={{ background: 'var(--surface-container-low)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, marginBottom: '0.4rem' }}>Budget Range</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{selectedRequest.budgetMin} - ₹{selectedRequest.budgetMax}</div>
-                </div>
-                <div style={{ background: 'var(--surface-container-low)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, marginBottom: '0.4rem' }}>Urgency</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: selectedRequest.urgency === 'Urgent' ? '#e53e3e' : '#38a169' }}>{selectedRequest.urgency}</div>
-                </div>
-              </div>
+              {!isPriceStep ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+                    <div style={{ background: 'var(--surface-container-low)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, marginBottom: '0.4rem' }}>Budget Range</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{selectedRequest.budgetMin} - ₹{selectedRequest.budgetMax}</div>
+                    </div>
+                    <div style={{ background: 'var(--surface-container-low)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, marginBottom: '0.4rem' }}>Urgency</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: selectedRequest.urgency === 'Urgent' ? '#e53e3e' : '#38a169' }}>{selectedRequest.urgency}</div>
+                    </div>
+                  </div>
 
-              <div style={{ marginBottom: '2rem' }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span className="material-icons" style={{ fontSize: '1.2rem', color: 'var(--primary)' }}>description</span>
-                  Job Description
-                </h4>
-                <p style={{ fontSize: '0.9rem', color: 'var(--on-surface-variant)', lineHeight: 1.6, background: 'var(--surface-container-lowest)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--outline-variant)' }}>
-                  {selectedRequest.description || "The user needs professional assistance with their request. Please click 'Place Bid' to offer your services and discuss further details."}
-                </p>
-              </div>
+                  <div style={{ marginBottom: '2rem' }}>
+                    <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className="material-icons" style={{ fontSize: '1.2rem', color: 'var(--primary)' }}>description</span>
+                      Job Description
+                    </h4>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--on-surface-variant)', lineHeight: 1.6, background: 'var(--surface-container-lowest)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--outline-variant)' }}>
+                      {selectedRequest.description || "The user needs professional assistance with their request. Please click 'Place Bid' to offer your services and discuss further details."}
+                    </p>
+                  </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
-                <div>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--on-surface)', marginBottom: '0.5rem' }}>Location</h4>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>
-                    <span className="material-icons" style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>location_on</span>
-                    {selectedRequest.address}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+                    <div>
+                      <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--on-surface)', marginBottom: '0.5rem' }}>Location</h4>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>
+                        <span className="material-icons" style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>location_on</span>
+                        {selectedRequest.address}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--on-surface)', marginBottom: '0.5rem' }}>Preferred Time</h4>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>
+                        <span className="material-icons" style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>schedule</span>
+                        27th March, 10 AM - 12 PM
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button 
+                      className="btn btn--ghost" 
+                      style={{ flex: 1, padding: '1rem' }}
+                      onClick={() => setSelectedRequest(null)}
+                    >Close</button>
+                    <button 
+                      className="btn btn--primary" 
+                      style={{ flex: 2, padding: '1rem', fontSize: '1rem' }}
+                      onClick={() => {
+                        setIsPriceStep(true)
+                        setCurrentBidPrice(Math.round((selectedRequest.budgetMin + selectedRequest.budgetMax) / 2))
+                      }}
+                    >
+                      {acceptedJobs.has(selectedRequest.id) ? 'Bid Already Placed' : 'Place Bid Now'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                  <div style={{ fontSize: '3rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '1rem' }}>₹{currentBidPrice}</div>
+                  
+                  <div style={{ marginBottom: '2.5rem', padding: '0 1rem' }}>
+                    <input 
+                      type="range" 
+                      min={selectedRequest.budgetMin} 
+                      max={selectedRequest.budgetMax} 
+                      value={currentBidPrice} 
+                      onChange={(e) => setCurrentBidPrice(parseInt(e.target.value))}
+                      style={{ width: '100%', height: '8px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.8rem', fontSize: '0.8rem', color: 'var(--on-surface-variant)', fontWeight: 600 }}>
+                      <span>₹{selectedRequest.budgetMin}</span>
+                      <span>₹{selectedRequest.budgetMax}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'rgba(56, 161, 105, 0.08)', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '2rem', display: 'flex', gap: '0.8rem', alignItems: 'center', textAlign: 'left' }}>
+                    <span className="material-icons" style={{ color: '#38a169' }}>info</span>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--on-surface-variant)', lineHeight: 1.4 }}>
+                      Choosing a price within the customer's budget increases your chance of winning by <strong style={{ color: '#38a169' }}>24%</strong>.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button 
+                      className="btn btn--ghost" 
+                      style={{ flex: 1, padding: '1rem' }}
+                      onClick={() => setIsPriceStep(false)}
+                    >Back</button>
+                    <button 
+                      className="btn btn--primary" 
+                      style={{ flex: 2, padding: '1rem', fontSize: '1rem' }}
+                      onClick={() => {
+                        setAcceptedJobs(prev => new Set([...prev, selectedRequest.id]))
+                        setActiveJob({ ...selectedRequest, bidPrice: currentBidPrice })
+                        setSelectedRequest(null)
+                        setIsPriceStep(false)
+                      }}
+                    >
+                      Confirm Bid — ₹{currentBidPrice}
+                    </button>
                   </div>
                 </div>
-                <div>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--on-surface)', marginBottom: '0.5rem' }}>Preferred Time</h4>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>
-                    <span className="material-icons" style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>schedule</span>
-                    27th March, 10 AM - 12 PM
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button 
-                  className="btn btn--ghost" 
-                  style={{ flex: 1, padding: '1rem' }}
-                  onClick={() => setSelectedRequest(null)}
-                >Close</button>
-                <button 
-                  className="btn btn--primary" 
-                  style={{ flex: 2, padding: '1rem', fontSize: '1rem' }}
-                  onClick={() => {
-                    setAcceptedJobs(prev => new Set([...prev, selectedRequest.id]))
-                    setActiveJob(selectedRequest)
-                    setSelectedRequest(null)
-                  }}
-                >
-                  {acceptedJobs.has(selectedRequest.id) ? 'Bid Already Placed' : 'Place Bid Now'}
-                </button>
-              </div>
+              )}
             </div>
           </div>
         </div>
