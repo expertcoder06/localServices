@@ -39,12 +39,9 @@ export default function AdminDashboard() {
             <span>Settings</span>
           </a>
         </nav>
-        <button className="mt-4 bg-primary text-on-primary py-3 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-primary-container transition-all active:scale-95">
-          New Report
-        </button>
         <div className="mt-auto pt-6 border-t border-slate-200">
           <a className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-error transition-colors font-inter text-sm font-semibold uppercase tracking-widest" href="#">
-            <span className="material-symbols-outlined" data-icon="logout">logout</span>
+            <span className="text-xl">🚪</span>
             <span>Logout</span>
           </a>
         </div>
