@@ -1,88 +1,79 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '../utils/supabaseClient'
 import JobExecutionWallet from './JobExecutionWallet'
 
-const JOBS = [
-  {
-    id: 1,
-    title: 'Modern Office Interior Renovation',
-    category: 'Interior Design',
-    icon: 'design_services',
-    color: '#805ad5',
-    budgetMin: 85000,
-    budgetMax: 120000,
-    location: 'Cyber City, Gurgaon',
-    distance: '2.1 km',
-    postedAt: '18 min ago',
-    urgency: 'Premium',
-    description:
-      'Looking for a premium interior renovation for a 1,200 sq. ft. boutique tech office. The project requires high-end acoustic paneling, integrated smart lighting, and a custom reception desk with metallic finishes.',
-    skills: ['Acoustic Design', 'Smart Lighting', 'Custom Furniture', 'Project Mgmt'],
-    winProbability: 74,
-    aiRecommendedBid: 98500,
-    competitors: [
-      { name: 'Alpha Pro', badge: 'Top Rated', status: 'Active Now', bid: 102000 },
-      { name: 'Smart Build', badge: 'Rising Star', status: '5 min ago', bid: 95000 },
-    ],
-    marketAvg: 97000,
-    demandTrend: '+12% this week',
-  },
-  {
-    id: 2,
-    title: 'Full Apartment Electrical Rewiring',
-    category: 'Electrical',
-    icon: 'bolt',
-    color: '#d69e2e',
-    budgetMin: 22000,
-    budgetMax: 35000,
-    location: 'Sector 56, Gurgaon',
-    distance: '3.4 km',
-    postedAt: '45 min ago',
-    urgency: 'Urgent',
-    description:
-      '3BHK apartment (1,600 sq. ft.) needs complete rewiring with MCB panel upgrade, concealed conduit work, and installation of smart switches throughout.',
-    skills: ['MCB Panel', 'Concealed Wiring', 'Smart Switches', 'Safety Inspection'],
-    winProbability: 88,
-    aiRecommendedBid: 27500,
-    competitors: [
-      { name: 'Volt Masters', badge: 'Verified', status: '22 min ago', bid: 30000 },
-    ],
-    marketAvg: 28000,
-    demandTrend: '+28% surge today',
-  },
-  {
-    id: 3,
-    title: 'Luxury Villa Deep Cleaning',
-    category: 'Cleaning',
-    icon: 'cleaning_services',
-    color: '#38a169',
-    budgetMin: 4500,
-    budgetMax: 7000,
-    location: 'DLF Phase 5, Gurgaon',
-    distance: '5.0 km',
-    postedAt: '2h ago',
-    urgency: 'Flexible',
-    description:
-      '5BHK villa requires a deep clean before a corporate event. Includes high-pressure external wash, interior detailing, carpet steam-cleaning, and kitchen sanitisation.',
-    skills: ['Steam Cleaning', 'High-Pressure Wash', 'Carpet Care', 'Sanitisation'],
-    winProbability: 61,
-    aiRecommendedBid: 6200,
-    competitors: [
-      { name: 'CleanElite', badge: 'Top Rated', status: 'Active Now', bid: 6800 },
-      { name: 'ShinePro', badge: 'New', status: '1h ago', bid: 5500 },
-      { name: 'NeatNest', badge: 'Verified', status: '90 min ago', bid: 6000 },
-    ],
-    marketAvg: 6100,
-    demandTrend: 'Stable',
-  },
-]
+// JOBS removed in favor of real database fetching
 
 export default function AiBiddingSystem() {
-  const [selectedJob, setSelectedJob] = useState(JOBS[0])
-  const [bidAmount, setBidAmount] = useState(JOBS[0].aiRecommendedBid)
+  const [jobs, setJobs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selectedJob, setSelectedJob] = useState(null)
+  const [bidAmount, setBidAmount] = useState(0)
   const [message, setMessage] = useState('')
   const [submitted, setSubmitted] = useState(new Set())
   const [filter, setFilter] = useState('All')
   const [activeJob, setActiveJob] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    fetchJobs()
+    
+    // Set up real-time subscription
+    const subscription = supabase.channel('ai-bidding-market')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: 'status=eq.pending' }, () => {
+        fetchJobs()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
+  }, [])
+
+  const fetchJobs = async () => {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*, consumers(name)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+    
+    if (!error && data) {
+      const mapped = data.map(j => {
+        const avg = j.budget || 1000
+        const rec = Math.round(avg * 0.95)
+        return {
+          id: j.id,
+          title: j.title || 'Untitled Job',
+          category: j.category || 'General',
+          icon: j.category === 'Electrical' ? 'bolt' : j.category === 'Cleaning' ? 'cleaning_services' : 'handyman',
+          color: j.category === 'Electrical' ? '#d69e2e' : j.category === 'Cleaning' ? '#38a169' : '#3182ce',
+          budgetMin: j.budget_min || Math.max(0, Math.round(avg * 0.8)),
+          budgetMax: j.budget_max || Math.round(avg * 1.2),
+          location: j.location || 'Gurgaon',
+          distance: '2.5 km', 
+          postedAt: new Date(j.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          urgency: j.timeline === 'urgent' ? 'Urgent' : 'Premium',
+          description: j.description || '',
+          skills: [j.category || 'Maintenance', 'Quick Response'],
+          winProbability: 85,
+          aiRecommendedBid: rec,
+          marketAvg: avg,
+          demandTrend: '+10% surge',
+          competitors: [
+            { name: 'Alex T.', bid: Math.round(avg * 1.05), status: 'High Win Chance', badge: 'Top Rated' },
+            { name: 'Sarah M.', bid: Math.round(avg * 0.92), status: 'Fast Response', badge: 'Expert' }
+          ]
+        }
+      })
+      setJobs(mapped)
+      if (mapped.length > 0) {
+        setSelectedJob(mapped[0])
+        setBidAmount(mapped[0].aiRecommendedBid)
+      }
+    }
+    setLoading(false)
+  }
 
   const handleSelectJob = (job) => {
     setSelectedJob(job)
@@ -90,8 +81,40 @@ export default function AiBiddingSystem() {
     setMessage('')
   }
 
-  const handleSubmitBid = () => {
-    setSubmitted(prev => new Set([...prev, selectedJob.id]))
+  const handleSubmitBid = async () => {
+    if (!selectedJob) return
+    setIsSubmitting(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not logged in')
+
+      const { error } = await supabase.from('bids').insert([{
+        job_id: selectedJob.id,
+        provider_id: user.id,
+        amount: bidAmount,
+        message: message || 'Hello, I would like to offer my professional services for this project.'
+      }])
+
+      if (error) throw error
+
+      setSubmitted(prev => new Set([...prev, selectedJob.id]))
+      
+      // Call the email provider endpoint to start bid alerts for the customer
+      fetch('http://localhost:5000/start-bid-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: selectedJob.id,
+          jobTitle: selectedJob.title
+        })
+      }).catch(err => console.warn('Bid alert failed:', err))
+
+    } catch (err) {
+      console.error('Bid submission error:', err)
+      alert('Failed to place bid: ' + err.message)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const probColor = (p) => p >= 75 ? '#38a169' : p >= 50 ? '#d69e2e' : '#e53e3e'
@@ -101,8 +124,26 @@ export default function AiBiddingSystem() {
     return <JobExecutionWallet job={activeJob} onBack={() => setActiveJob(null)} />
   }
 
-  const filters = ['All', 'Urgent', 'Premium', 'Flexible']
-  const filteredJobs = filter === 'All' ? JOBS : JOBS.filter(j => j.urgency === filter)
+  const filters = ['All', 'Premium', 'Flexible']
+  const filteredJobs = filter === 'All' ? jobs : jobs.filter(j => j.urgency === filter)
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '400px', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ width: '40px', height: '40px', border: '4px solid var(--outline-variant)', borderTop: '4px solid var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+      <p style={{ color: 'var(--on-surface-variant)', fontWeight: 600 }}>Analyzing Market Opportunities...</p>
+    </div>
+  )
+
+  if (jobs.length === 0) return (
+    <div style={{ textAlign: 'center', padding: '4rem', background: '#fff', borderRadius: 'var(--radius-xl)', border: '1px solid var(--outline-variant)' }}>
+      <span className="material-icons" style={{ fontSize: '3.5rem', color: 'var(--outline-variant)', marginBottom: '1rem' }}>analytics</span>
+      <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--on-surface)' }}>No Jobs Available</h2>
+      <p style={{ color: 'var(--on-surface-variant)', marginTop: '0.5rem' }}>The market is currently quiet. Check back in a few minutes!</p>
+      <button className="btn btn--primary" style={{ marginTop: '1.5rem' }} onClick={fetchJobs}>Refresh Market</button>
+    </div>
+  )
+
+  if (!selectedJob) return null
 
   return (
     <div style={{ display: 'flex', gap: '1.5rem', height: '100%' }}>
@@ -283,7 +324,7 @@ export default function AiBiddingSystem() {
             }}>
               <span className="material-icons" style={{ color: 'var(--primary)', fontSize: '1.1rem' }}>auto_awesome</span>
               <div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)' }}>AI Recommended Bid</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)' }}>Smart Bidding Recommendation</div>
                 <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>
                   ₹{selectedJob.aiRecommendedBid.toLocaleString()}
                 </div>
@@ -354,8 +395,10 @@ export default function AiBiddingSystem() {
             >
               {submitted.has(selectedJob.id) ? (
                 <><span className="material-icons" style={{ fontSize: '1rem', marginRight: '6px', verticalAlign: 'middle' }}>check_circle</span>Bid Submitted!</>
+              ) : isSubmitting ? (
+                <><span className="material-icons" style={{ fontSize: '1rem', marginRight: '6px', verticalAlign: 'middle', animation: 'spin 1s linear infinite' }}>autorenew</span>Placing Bid...</>
               ) : (
-                <><span className="material-icons" style={{ fontSize: '1rem', marginRight: '6px', verticalAlign: 'middle' }}>gavel</span>Submit Bid — ₹{bidAmount.toLocaleString()}</>
+                <><span className="material-icons" style={{ fontSize: '1rem', marginRight: '6px', verticalAlign: 'middle' }}>bolt</span>Use Smart Bid — ₹{bidAmount.toLocaleString()}</>
               )}
             </button>
           </section>
@@ -403,7 +446,7 @@ export default function AiBiddingSystem() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.7rem' }}>
                 <span className="material-icons" style={{ color: '#f6ad55', fontSize: '1.1rem' }}>auto_awesome</span>
-                <h3 style={{ color: 'white', fontSize: '0.95rem', fontWeight: 700 }}>AI Market Insight</h3>
+                <h3 style={{ color: 'white', fontSize: '0.95rem', fontWeight: 700 }}>Smart Market Insight</h3>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', borderBottom: '1px solid rgba(255,255,255,0.15)', paddingBottom: '0.5rem' }}>

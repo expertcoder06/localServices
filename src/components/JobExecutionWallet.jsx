@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 
 
+import { supabase } from '../utils/supabaseClient'
+
 const MILESTONES = [
   { label: 'Job Accepted', status: 'done', time: '09:00 AM' },
   { label: 'Arrived & Started', status: 'active', time: 'Now' },
@@ -17,9 +19,51 @@ const WALLET_TRANSACTIONS = [
 ]
 
 export default function JobExecutionWallet({ job, onBack }) {
-  const [walletBalance] = useState(34450)
+  const [walletBalance, setWalletBalance] = useState(0)
   const [pendingEarning] = useState(job?.bidPrice ?? job?.budgetMin ?? 800)
-  const [isAccepted, setIsAccepted] = useState(false)
+  const [isAccepted, setIsAccepted] = useState(true) // Start true if we're in tracking mode
+
+  useEffect(() => {
+     async function fetchBalance() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data } = await supabase.from('service_providers').select('wallet_balance').eq('id', user.id).single()
+          if (data) setWalletBalance(data.wallet_balance)
+        }
+     }
+     fetchBalance()
+  }, [])
+
+  const handleCancelByProvider = async () => {
+    if (!window.confirm('Cancelling after acceptance incurs a ₹100 penalty. Continue?')) return
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // 1. Deduct Penalty
+      const newBalance = walletBalance - 100
+      await supabase.from('service_providers').update({ wallet_balance: newBalance }).eq('id', user.id)
+      setWalletBalance(newBalance)
+
+      // 2. Log Penalty
+      await supabase.from('penalties').insert([{
+        user_id: user.id,
+        user_type: 'provider',
+        job_id: job.id,
+        penalty_type: 'provider_cancel',
+        wallet_deduction: 100,
+        description: 'Job cancelled by provider after acceptance.'
+      }])
+
+      // 3. Update Job
+      await supabase.from('jobs').update({ status: 'cancelled_by_provider' }).eq('id', job.id)
+
+      alert('Job cancelled. ₹100 penalty deducted.')
+      onBack()
+    } catch (err) {
+      alert('Action failed: ' + err.message)
+    }
+  }
 
 
   return (
@@ -153,10 +197,20 @@ export default function JobExecutionWallet({ job, onBack }) {
             <button
               className="btn btn--primary"
               style={{ width: '100%', padding: '0.8rem', fontSize: '0.95rem', fontWeight: 700, marginTop: '1rem' }}
-              onClick={onBack}
+              onClick={() => {
+                alert('Job marked as completed. Customer will now release the payment after verification.')
+                onBack()
+              }}
             >
               <span className="material-icons" style={{ fontSize: '1.2rem', verticalAlign: 'middle', marginRight: '8px' }}>check_circle</span>
               Mark Job as Complete
+            </button>
+            <button
+               className="btn btn--ghost"
+               style={{ width: '100%', padding: '0.8rem', fontSize: '0.9rem', color: '#e53e3e', marginTop: '0.5rem' }}
+               onClick={handleCancelByProvider}
+            >
+               Cancel Job (₹100 Penalty)
             </button>
           </>
         )}

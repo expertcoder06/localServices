@@ -1,23 +1,58 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { supabase } from '../utils/supabaseClient'
 
 export default function ServiceProviderProfile({ provider = {}, isEditable = false }) {
   const [isSelfEditing, setIsSelfEditing] = useState(false)
   const [proData, setProData] = useState({
-    businessName: provider.businessName || provider.name || 'Marcus Richardson',
-    role: provider.role || provider.service_name || 'Master HVAC Specialist',
-    email: provider.email || 'marcus.hvac@expert.com',
-    phone: provider.phone || '+91 88822 11000',
-    location: provider.location || `${provider.city || 'Gurgaon'}, ${provider.state || 'Haryana'}`,
-    logo: provider.photo_url || null,
-    experience: provider.experience || '12 years',
-    status: provider.status === 'approved' ? 'Verified Platinum' : 'Pending Verification',
-    rate: provider.hourly_rate ? `₹${provider.hourly_rate} / hr` : '₹500 / hr',
-    categories: provider.categories || [],
-    service_name: provider.service_name || '',
-    custom_service_name: '',
-    license: provider.license || 'H-V-122934-EXP',
-    ...provider
+    businessName: 'Loading...',
+    role: '',
+    email: '',
+    phone: '',
+    location: '',
+    logo: null,
+    experience: '...',
+    status: '...',
+    rate: '...',
+    categories: []
   })
+
+  useEffect(() => {
+    async function loadProfile() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('service_providers')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (data && !error) {
+        setProData({
+          ...data,
+          businessName: data.name || 'Not Set',
+          role: data.service_name || 'General Provider',
+          email: data.email,
+          phone: data.phone || 'Enter Phone',
+          location: data.location || (data.city ? `${data.city}, ${data.state}` : 'Add Location'),
+          logo: data.photo_url,
+          experience: data.experience || 'Not Specified',
+          status: data.status === 'approved' ? 'Verified Platinum' : 'Pending Verification',
+          rate: `₹${data.hourly_rate || 500} / hr`,
+          categories: data.categories || []
+        })
+        setTempData({
+          ...data,
+          businessName: data.name || 'Not Set',
+          role: data.service_name || 'General Provider',
+          location: data.location || (data.city ? `${data.city}, ${data.state}` : 'Add Location'),
+          logo: data.photo_url,
+          hourly_rate: data.hourly_rate || 500
+        })
+      }
+    }
+    loadProfile()
+  }, [])
 
   const [tempData, setTempData] = useState({ ...proData })
 
@@ -26,17 +61,44 @@ export default function ServiceProviderProfile({ provider = {}, isEditable = fal
     if (file) {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setTempData(prev => ({ ...prev, logo: reader.result }))
+        setTempData(prev => ({ ...prev, logo: reader.result, photo_url: reader.result }))
       }
       reader.readAsDataURL(file)
     }
   }
 
-  const handleSave = () => {
-    const finalRole = tempData.service_name === 'Other' ? tempData.custom_service_name : tempData.service_name;
-    setProData({ ...tempData, role: finalRole || tempData.role, service_name: finalRole });
-    setIsSelfEditing(false);
-    // Note: To persist this to the DB, you'd add a Supabase update call here.
+  const handleSave = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const updates = {
+        name: tempData.businessName,
+        service_name: tempData.service_name || tempData.role,
+        location: tempData.location,
+        hourly_rate: parseInt(tempData.hourly_rate) || 500,
+        photo_url: tempData.photo_url || tempData.logo
+      }
+
+      const { error } = await supabase
+        .from('service_providers')
+        .update(updates)
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      setProData({ 
+        ...proData, 
+        ...tempData,
+        businessName: tempData.businessName,
+        role: tempData.service_name || tempData.role,
+        rate: `₹${tempData.hourly_rate || 500} / hr`
+      })
+      setIsSelfEditing(false)
+      alert('Profile updated successfully!')
+    } catch (err) {
+      alert('Error updating profile: ' + err.message)
+    }
   }
 
   // Specialized Trust Score Algorithm
@@ -233,9 +295,9 @@ export default function ServiceProviderProfile({ provider = {}, isEditable = fal
               <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', fontWeight: 700, marginBottom: '0.4rem' }}>Standard Rate</div>
               {isSelfEditing ? (
                 <input 
-                  type="text" 
-                  value={tempData.rate} 
-                  onChange={e => setTempData({...tempData, rate: e.target.value})}
+                  type="number" 
+                  value={tempData.hourly_rate} 
+                  onChange={e => setTempData({...tempData, hourly_rate: e.target.value})}
                   style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--primary)', borderRadius: 'var(--radius-sm)', fontSize: '1.2rem', fontWeight: 800 }}
                 />
               ) : (

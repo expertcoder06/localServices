@@ -4,7 +4,7 @@ import { supabase } from '../utils/supabaseClient'
 
 const CUSTOMER_NAME = 'You'
 
-async function sendBidAcceptedEmail(provider) {
+async function sendBidAcceptedEmail(provider, jobTitle) {
   try {
     await fetch('http://localhost:5000/send-bid-accepted', {
       method: 'POST',
@@ -12,7 +12,7 @@ async function sendBidAcceptedEmail(provider) {
       body: JSON.stringify({
         providerEmail: provider.email,
         providerName:  provider.name,
-        jobTitle:      JOB_TITLE,
+        jobTitle:      jobTitle,
         customerName:  CUSTOMER_NAME,
         amount:        provider.hourly_rate ?? 'N/A',
       }),
@@ -35,16 +35,33 @@ export default function CustomerJobsFlow() {
   const [user, setUser] = useState(null)
 
   useEffect(() => {
+    let subscription;
     async function init() {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       setUser(authUser)
       if (authUser) {
-        fetchJobAndBids(authUser.id)
+        const currentJob = await fetchJobAndBids(authUser.id)
+        
+        if (currentJob) {
+          subscription = supabase.channel(`job-bids-${currentJob.id}`)
+            .on('postgres_changes', { 
+              event: '*', 
+              schema: 'public', 
+              table: 'bids',
+              filter: `job_id=eq.${currentJob.id}`
+            }, () => {
+              fetchJobAndBids(authUser.id)
+            })
+            .subscribe()
+        }
       } else {
         setLoading(false)
       }
     }
     init()
+    return () => {
+      if (subscription) supabase.removeChannel(subscription)
+    }
   }, [])
 
   async function fetchJobAndBids(userId) {
@@ -72,9 +89,32 @@ export default function CustomerJobsFlow() {
 
         if (bidsError) throw bidsError
         setBids(bidsData || [])
+
+        // 3. Start bid reminder emails if bids exist and job is still pending
+        if (bidsData && bidsData.length > 0 && jobData.status === 'pending') {
+          const { data: consumer } = await supabase
+            .from('consumers')
+            .select('email, name')
+            .eq('id', userId)
+            .single()
+
+          fetch('http://localhost:5000/start-bid-alert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jobId: jobData.id,
+              consumerEmail: consumer?.email,
+              consumerName: consumer?.name,
+              jobTitle: jobData.title,
+            }),
+          }).catch(err => console.warn('Bid alert start failed:', err))
+        }
+        return jobData
       }
+      return null
     } catch (err) {
       console.error('Error fetching job/bids:', err)
+      return null
     } finally {
       setLoading(false)
     }
@@ -90,13 +130,29 @@ export default function CustomerJobsFlow() {
       
       if (bidUpdateError) throw bidUpdateError
 
-      // 2. Update job status
+      // 2. Update job status and set deadlines
+      const promisedHours = bid.promised_hours || 2
+      const acceptedAt = new Date().toISOString()
+      const promisedCompletionAt = new Date(Date.now() + promisedHours * 60 * 60 * 1000).toISOString()
+
       const { error: jobUpdateError } = await supabase
         .from('jobs')
-        .update({ status: 'accepted' })
+        .update({ 
+          status: 'accepted',
+          accepted_at: acceptedAt,
+          promised_completion_at: promisedCompletionAt,
+          accepted_provider_id: bid.provider_id
+        })
         .eq('id', job.id)
       
       if (jobUpdateError) throw jobUpdateError
+
+      // 3. Stop bid reminder emails since user accepted a bid
+      fetch('http://localhost:5000/stop-bid-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id }),
+      }).catch(err => console.warn('Bid alert stop failed:', err))
 
       // 3. Send email notification
       if (bid.service_providers) {
@@ -104,7 +160,7 @@ export default function CustomerJobsFlow() {
           email: bid.service_providers.email,
           name: bid.service_providers.name,
           hourly_rate: bid.amount
-        })
+        }, job.title)
       }
 
       setSelectedBid(bid)
@@ -416,6 +472,111 @@ export default function CustomerJobsFlow() {
           <button className="btn btn--ghost" style={{ display: 'block', margin: '1rem auto' }} onClick={() => setView('bid_list')}>Cancel</button>
         </div>
       )
+  }
+
+  if (view === 'tracking') {
+    const isOverdue = job?.promised_completion_at && new Date() > new Date(job.promised_completion_at)
+    
+    const handleReleasePayment = async () => {
+      try {
+        const bid = selectedBid || bids.find(b => b.status === 'accepted')
+        const baseAmount = bid?.amount || job.budget || 0
+        let penaltyAmount = 0
+        let penaltyDesc = ''
+
+        // Delay Penalty: 10% deduction if overdue
+        if (isOverdue) {
+          penaltyAmount = baseAmount * 0.15 
+          penaltyDesc = 'Provider deadline missed (15% penalty)'
+        }
+
+        const finalAmount = baseAmount - penaltyAmount
+
+        // 1. Log Penalty if any
+        if (penaltyAmount > 0) {
+          await supabase.from('penalties').insert([{
+            user_id: job.accepted_provider_id,
+            user_type: 'provider',
+            job_id: job.id,
+            penalty_type: 'provider_deadline_missed',
+            wallet_deduction: penaltyAmount,
+            description: penaltyDesc
+          }])
+        }
+
+        // 2. Update Provider Wallet
+        const { data: pro } = await supabase.from('service_providers').select('wallet_balance').eq('id', job.accepted_provider_id).single()
+        await supabase.from('service_providers').update({ wallet_balance: (pro?.wallet_balance || 0) + finalAmount }).eq('id', job.accepted_provider_id)
+
+        // 3. Update Job
+        await supabase.from('jobs').update({ status: 'completed', actual_completion_at: new Date().toISOString() }).eq('id', job.id)
+
+        alert(penaltyAmount > 0 ? `Payment released with ₹${penaltyAmount} penalty for delay.` : 'Payment released successfully!')
+        setView('success')
+      } catch (err) {
+        alert('Action failed: ' + err.message)
+      }
+    }
+
+    const handleCancelJob = async () => {
+      if (!window.confirm('Cancelling after acceptance incurs a ₹100 penalty. Proceed?')) return
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        // 1. Deduct from Customer
+        const { data: consumer } = await supabase.from('consumers').select('wallet_balance').eq('id', user.id).single()
+        await supabase.from('consumers').update({ wallet_balance: (consumer?.wallet_balance || 0) - 100 }).eq('id', user.id)
+
+        // 2. Log Penalty
+        await supabase.from('penalties').insert([{
+          user_id: user.id,
+          user_type: 'customer',
+          job_id: job.id,
+          penalty_type: 'customer_cancel_after_dispatch',
+          wallet_deduction: 100,
+          description: 'Job cancelled by customer after provider acceptance.'
+        }])
+
+        // 3. Reset Job
+        await supabase.from('jobs').update({ status: 'cancelled', cancelled_by: user.id, cancelled_at: new Date().toISOString() }).eq('id', job.id)
+
+        alert('Job cancelled. ₹100 penalty deducted from your wallet.')
+        setView('job_list')
+      } catch (err) {
+        alert('Cancellation failed: ' + err.message)
+      }
+    }
+
+    return (
+      <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '1.5rem' }}>🔥 Job Tracking</h1>
+        
+        <div style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '2rem', border: '1px solid var(--outline-variant)', boxShadow: 'var(--shadow-sm)', marginBottom: '1.5rem', textAlign: 'left' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+             <div>
+               <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{job?.title}</h3>
+               <p style={{ fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>Provider: {selectedBid?.service_providers?.name || 'Assigned'}</p>
+             </div>
+             <div style={{ background: isOverdue ? 'rgba(229,62,62,0.1)' : 'rgba(56,161,105,0.1)', color: isOverdue ? '#e53e3e' : '#38a169', padding: '4px 12px', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 700 }}>
+               {isOverdue ? '⚠️ DELAYED' : '✅ ON TRACK'}
+             </div>
+          </div>
+
+          <div style={{ background: 'var(--surface-container-low)', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Estimate Completion By</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{job?.promised_completion_at ? new Date(job.promised_completion_at).toLocaleTimeString() : 'In Progress'}</div>
+          </div>
+
+          <button className="btn btn--primary" style={{ width: '100%', padding: '1rem', marginBottom: '1rem' }} onClick={handleReleasePayment}>
+             Complete Work & Release Payment
+          </button>
+          
+          <button className="btn btn--ghost" style={{ width: '100%', color: '#e53e3e' }} onClick={handleCancelJob}>
+             Cancel Work (₹100 Penalty)
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (view === 'success') {
