@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
 import { getCurrentLocation } from '../utils/locationService';
+import FaceVerification from '../components/FaceVerification';
+import { loadModels, extractEmbeddingFromImage, calculateSimilarity } from '../utils/faceService';
+
+
 
 const Signup = () => {
   const [role, setRole] = useState(null); // 'consumer' | 'provider'
@@ -9,6 +13,12 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+  const [showFaceVerification, setShowFaceVerification] = useState(false);
+  const [faceData, setFaceData] = useState(null); // { embedding, photo, similarity }
+  const [uploadedEmbedding, setUploadedEmbedding] = useState(null);
+  const [uploadStatus, setUploadStatus] = useState(null); // 'processing', 'success', 'error'
+
+
   
   const navigate = useNavigate();
 
@@ -26,8 +36,36 @@ const Signup = () => {
   };
 
   const handleFileChange = (e) => {
-    setFiles({ ...files, [e.target.name]: e.target.files[0] });
+    const { name, files: selectedFiles } = e.target;
+    setFiles({ ...files, [name]: selectedFiles[0] });
+
+    if (name === 'photo' && selectedFiles[0]) {
+      handleUploadedPhoto(selectedFiles[0]);
+    }
   };
+
+  const handleUploadedPhoto = async (file) => {
+    setUploadStatus('processing');
+    try {
+      await loadModels(); // ensure models are loaded
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(file);
+      img.onload = async () => {
+        const embedding = await extractEmbeddingFromImage(img);
+        if (embedding) {
+          setUploadedEmbedding(embedding);
+          setUploadStatus('success');
+        } else {
+          setUploadStatus('error');
+          setError("No face detected in the uploaded photo. Please try a clearer image.");
+        }
+      };
+    } catch (err) {
+      setUploadStatus('error');
+      console.error(err);
+    }
+  };
+
 
   const handleGetLocation = async () => {
     try {
@@ -45,6 +83,7 @@ const Signup = () => {
     return supabase.storage.from('provider_documents').getPublicUrl(path).data.publicUrl;
   };
 
+  // Stage 1: Register User Directly (No OTP)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
@@ -54,36 +93,52 @@ const Signup = () => {
     setError(null);
 
     try {
-      // 1. Sign up user via Auth
+      // 1. Sign up user via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
       });
 
       if (authError) throw authError;
+      
       const userId = authData.user.id;
       let aadhar_url = '', pan_url = '', photo_url = '';
 
-      // 2. If provider, upload documents
+      // 2. Upload documents securely if provider
       if (role === 'provider') {
+        if (!faceData) {
+          throw new Error("Live face verification is required for service providers.");
+        }
+        
+        if (faceData.similarity < 70) {
+          throw new Error("Identity match failed. The uploaded photo and live scan do not appear to be the same person.");
+        }
+
+
         if (files.aadhar) aadhar_url = await uploadFile(files.aadhar, `${userId}/aadhar_${files.aadhar.name}`);
         if (files.pan) pan_url = await uploadFile(files.pan, `${userId}/pan_${files.pan.name}`);
-        if (files.photo) photo_url = await uploadFile(files.photo, `${userId}/photo_${files.photo.name}`);
         
-        // Insert into service_providers
+        // Use the photo from face verification
+        const facePhotoFile = await (await fetch(faceData.photo)).blob();
+        photo_url = await uploadFile(facePhotoFile, `${userId}/face_verified.jpg`);
+        
+        // 3a. Insert into service_providers
         const { error: dbError } = await supabase.from('service_providers').insert({
           id: userId,
           name: formData.name, email: formData.email, phone: formData.phone,
           country: formData.country, state: formData.state, city: formData.city,
           address: formData.address,
           aadhar_url, pan_url, photo_url,
+          face_embedding: faceData.embedding,
+          is_face_verified: true,
           status: 'pending'
         });
+
         if (dbError) throw dbError;
 
-        setSuccessMsg("Welcome to Local services the new era of opportunities we are reviewing your profile we will shortly contact you thank you");
+        setSuccessMsg("Welcome to Local Services! We are reviewing your profile and will contact you shortly. Thank you.");
       } else {
-        // Insert into consumers
+        // 3b. Insert into consumers
         const { error: dbError } = await supabase.from('consumers').insert({
           id: userId,
           name: formData.name, email: formData.email, phone: formData.phone,
@@ -92,7 +147,7 @@ const Signup = () => {
         });
         if (dbError) throw dbError;
 
-        setSuccessMsg("Congratulations your registration done navigating to login");
+        setSuccessMsg("Congratulations, your registration is complete! Navigating to login...");
         setTimeout(() => navigate('/login'), 3500);
       }
     } catch (err) {
@@ -116,7 +171,9 @@ const Signup = () => {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
       <div className="glass-card custom-scrollbar" style={{ padding: '2.5rem', width: '100%', maxWidth: '650px', borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
-        <h2 style={{ textAlign: 'center', marginBottom: '2rem', color: 'var(--primary)' }}>Create Account</h2>
+        <h2 style={{ textAlign: 'center', marginBottom: '2rem', color: 'var(--primary)' }}>
+          {step === 3 ? 'Check Your Email' : 'Create Account'}
+        </h2>
         
         {error && <div style={{ color: 'var(--error)', marginBottom: '1.5rem', textAlign: 'center', padding: '1rem', background: '#ffe4e6', borderRadius: 'var(--radius-sm)', fontWeight: 500 }}>{error}</div>}
 
@@ -218,11 +275,47 @@ const Signup = () => {
                     <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', fontWeight: 600 }}>PAN Card Image</label>
                     <input type="file" name="pan" accept="image/*,.pdf" onChange={handleFileChange} required style={{ width: '100%' }} />
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', fontWeight: 600 }}>Professional Facial Photo</label>
-                    <input type="file" name="photo" accept="image/*" onChange={handleFileChange} required style={{ width: '100%' }} />
+                  
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 600 }}>Identity Verification</label>
+                    {!faceData ? (
+                      <button 
+                        type="button" 
+                        onClick={() => setShowFaceVerification(true)}
+                        style={{ width: '100%', padding: '0.75rem', background: 'var(--tertiary)', color: 'white', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        Start Face Verification & Photo Capture
+                      </button>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: 'var(--radius-sm)', border: '1px solid #10b981' }}>
+                        <img src={faceData.photo} alt="Verified Face" style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover' }} />
+                        <div>
+                          <span style={{ color: '#059669', fontWeight: 600, fontSize: '0.9rem', display: 'block' }}>✅ Face Verified Successfully</span>
+                          <span style={{ fontSize: '0.75rem', color: '#059669' }}>Match Score: {Math.round(faceData.similarity)}%</span>
+                        </div>
+                        <button type="button" onClick={() => setShowFaceVerification(true)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--primary)', textDecoration: 'underline', fontSize: '0.8rem' }}>Retake</button>
+                      </div>
+
+                    )}
+                  </div>
+
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 600 }}>Registration Photo (for Comparison)</label>
+                    <input 
+                      type="file" 
+                      name="photo" 
+                      accept="image/*" 
+                      onChange={handleFileChange} 
+                      required 
+                      style={{ width: '100%' }} 
+                    />
+                    {uploadStatus === 'processing' && <p style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>Analyzing photo...</p>}
+                    {uploadStatus === 'success' && <p style={{ fontSize: '0.8rem', color: '#10b981' }}>✅ Photo analysis complete. You can now start live verification.</p>}
+                    {uploadStatus === 'error' && <p style={{ fontSize: '0.8rem', color: 'var(--error)' }}>❌ Could not detect a face. Please use a clearer photo.</p>}
                   </div>
                 </div>
+
+
               </>
             )}
 
@@ -231,13 +324,29 @@ const Signup = () => {
                 Back
               </button>
               <button type="submit" disabled={loading} style={{ padding: '1rem', flex: 2, background: 'var(--primary)', color: 'var(--on-primary)', borderRadius: 'var(--radius-sm)', fontWeight: 'bold', fontSize: '1rem' }} className="neon-glow-hover">
-                {loading ? 'Processing...' : 'Complete Registration'}
+                {loading ? 'Registering...' : 'Register'}
               </button>
             </div>
           </form>
         )}
       </div>
+
+      {showFaceVerification && (
+        <FaceVerification 
+          onVerified={(data) => {
+            let similarity = 100;
+            if (uploadedEmbedding) {
+              similarity = calculateSimilarity(data.embedding, uploadedEmbedding);
+            }
+            setFaceData({ ...data, similarity });
+            setShowFaceVerification(false);
+          }}
+          onCancel={() => setShowFaceVerification(false)}
+        />
+      )}
+
     </div>
+
   );
 };
 
