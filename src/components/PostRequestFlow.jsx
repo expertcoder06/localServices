@@ -113,6 +113,55 @@ export default function PostRequestFlow({ onClose }) {
   })
   const [search, setSearch] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [mediaRecorder, setMediaRecorder] = useState(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const audioRef = useRef(null)
+  const [isLocating, setIsLocating] = useState(false)
+
+  // Audio Playback logic
+  const toggleAudio = () => {
+    if (!form.audio) return
+    if (!audioRef.current) {
+      audioRef.current = new Audio(form.audio)
+      audioRef.current.onended = () => setIsPlaying(false)
+    }
+    
+    if (isPlaying) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+    } else {
+      audioRef.current.play()
+      setIsPlaying(false) // Trigger re-render if needed or use state
+      setIsPlaying(true)
+    }
+  }
+
+  const fetchCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser")
+      return
+    }
+    setIsLocating(true)
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const { latitude, longitude } = position.coords
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
+        const data = await response.json()
+        const address = data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+        update('location', address)
+      } catch (err) {
+        console.error("Geocoding error", err)
+        update('location', `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+      } finally {
+        setIsLocating(false)
+      }
+    }, (err) => {
+      console.error("Location error", err)
+      alert("Unable to retrieve your location. Please check permissions.")
+      setIsLocating(false)
+    })
+  }
 
   const handlePublish = async () => {
     setIsPublishing(true)
@@ -339,18 +388,30 @@ export default function PostRequestFlow({ onClose }) {
           {/* Audio */}
           <div style={{ flex: 1, position: 'relative' }}>
             <div
-              style={{ height: '100%', border: '2px dashed var(--outline-variant)', borderRadius: 'var(--radius-md)', padding: '1.5rem', textAlign: 'center', cursor: form.audio ? 'default' : 'pointer', background: isRecording ? 'rgba(229,62,62,0.05)' : form.audio ? 'rgba(56,161,105,0.05)' : '#fafafa' }}
-              onClick={form.audio ? null : isRecording ? stopRecording : startRecording}
+              style={{ height: '100%', border: '2px dashed var(--outline-variant)', borderRadius: 'var(--radius-md)', padding: '1.5rem', textAlign: 'center', cursor: 'pointer', background: isRecording ? 'rgba(229,62,62,0.05)' : form.audio ? 'rgba(56,161,105,0.05)' : '#fafafa' }}
+              onClick={isRecording ? stopRecording : form.audio ? toggleAudio : startRecording}
             >
-              <span className="material-icons" style={{ color: isRecording ? '#e53e3e' : form.audio ? '#38a169' : 'var(--outline)', fontSize: '1.8rem', marginBottom: '0.3rem', display: 'block', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
-                {isRecording ? 'stop_circle' : form.audio ? 'library_music' : 'mic'}
+              <span className="material-icons" style={{ color: isRecording ? '#e53e3e' : form.audio ? 'var(--primary)' : 'var(--outline)', fontSize: '1.8rem', marginBottom: '0.3rem', display: 'block', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
+                {isRecording ? 'stop_circle' : isPlaying ? 'pause_circle' : form.audio ? 'play_circle' : 'mic'}
               </span>
-              <span style={{ fontSize: '0.78rem', color: 'var(--on-surface-variant)', lineHeight: 1.3, display: 'block' }}>
-                {isRecording ? 'Recording... Tap to stop' : form.audio ? 'Voice message ready' : 'Tap to record audio'}
+              <span style={{ fontSize: '0.78rem', color: isPlaying ? 'var(--primary)' : 'var(--on-surface-variant)', lineHeight: 1.3, display: 'block', fontWeight: isPlaying ? 700 : 400 }}>
+                {isRecording ? 'Recording...' : isPlaying ? 'Playing Audio' : form.audio ? 'Tap to Preview' : 'Tap to record'}
               </span>
             </div>
-            {form.audio && <span className="material-icons" style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '1.2rem', color: '#e53e3e', cursor: 'pointer' }} onClick={(e) => { e.preventDefault(); update('audio', false); }}>cancel</span>}
-            {form.audio && <audio src={form.audio} controls style={{ width: '100%', marginTop: '0.5rem', height: '30px' }} />}
+            {form.audio && (
+              <span 
+                className="material-icons" 
+                style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '1.2rem', color: '#e53e3e', cursor: 'pointer', background: 'white', borderRadius: '50%' }} 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  if(isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
+                  update('audio', false); 
+                  audioRef.current = null;
+                }}
+              >
+                cancel
+              </span>
+            )}
           </div>
 
         </div>
@@ -443,9 +504,23 @@ export default function PostRequestFlow({ onClose }) {
         <label style={labelStyle}>Your Address / Area *</label>
         <div style={{ position: 'relative' }}>
           <span className="material-icons" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--outline)', fontSize: '1.1rem' }}>location_on</span>
-          <input style={{ ...inputStyle, paddingLeft: '2.4rem' }} placeholder="e.g. Sector 21, Gurgaon"
+          <input style={{ ...inputStyle, paddingLeft: '2.4rem', paddingRight: '6.5rem' }} placeholder="e.g. Sector 21, Gurgaon"
             value={form.location} onChange={e => update('location', e.target.value)}
             onFocus={e => e.target.style.borderColor = 'var(--primary)'} onBlur={e => e.target.style.borderColor = 'var(--outline-variant)'} />
+          <button 
+            type="button" 
+            onClick={fetchCurrentLocation}
+            disabled={isLocating}
+            style={{ 
+              position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)',
+              background: 'var(--primary-container)', color: 'var(--primary)', border: 'none',
+              borderRadius: 'var(--radius-sm)', padding: '0.3rem 0.6rem', fontSize: '0.7rem',
+              fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+            }}
+          >
+            <span className="material-icons" style={{ fontSize: '0.9rem' }}>{isLocating ? 'sync' : 'my_location'}</span>
+            {isLocating ? 'Scanning...' : 'Near Me'}
+          </button>
         </div>
       </div>
 
@@ -532,31 +607,7 @@ export default function PostRequestFlow({ onClose }) {
         <button
           className="btn btn--primary"
           disabled={isPublishing}
-          onClick={async () => {
-            setIsPublishing(true)
-            try {
-              const { data: { user } } = await supabase.auth.getUser()
-              if (!user) throw new Error('User not found')
-
-              const { error } = await supabase.from('jobs').insert([{
-                consumer_id: user.id,
-                title: form.title,
-                description: form.description,
-                category: form.service,
-                location: form.location,
-                budget: parseFloat(form.budgetMax) || 0,
-                status: 'pending'
-              }])
-
-              if (error) throw error
-              setStep(6)
-            } catch (err) {
-              console.error('Error publishing job:', err)
-              alert('Failed to publish request. Please try again.')
-            } finally {
-              setIsPublishing(false)
-            }
-          }}
+          onClick={handlePublish}
           style={{ fontSize: '0.85rem', background: 'linear-gradient(135deg, #dd6b20, #e53e3e)', border: 'none', fontWeight: 700, padding: '0.6rem 1.4rem', opacity: isPublishing ? 0.7 : 1 }}
         >
           <span className="material-icons" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '4px' }}>
