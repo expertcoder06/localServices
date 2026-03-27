@@ -15,6 +15,8 @@ export default function ProtectedRoute({ children, requireAdmin = false }) {
         return;
       }
 
+
+
       if (requireAdmin) {
         const { data: admin } = await supabase
           .from('admin')

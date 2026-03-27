@@ -13,10 +13,11 @@ import Signup from './pages/Signup'
 import PendingApproval from './pages/PendingApproval'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminLogin from './pages/AdminLogin'
+import VerifyEmailStatus from './pages/VerifyEmailStatus'
 
 function App() {
   const location = useLocation()
-  const noNavFooterRoutes = ['/onboarding', '/dashboard', '/admin', '/provider-dashboard', '/login', '/signup', '/pending-approval', '/admin-login']
+  const noNavFooterRoutes = ['/onboarding', '/dashboard', '/admin', '/provider-dashboard', '/login', '/signup', '/pending-approval', '/admin-login', '/verified-success']
   const showNavFooter = !noNavFooterRoutes.includes(location.pathname)
 
   return (
@@ -31,6 +32,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/verified-success" element={<VerifyEmailStatus />} />
         <Route path="/pending-approval" element={<ProtectedRoute><PendingApproval /></ProtectedRoute>} />
       </Routes>
       {showNavFooter && <Footer />}

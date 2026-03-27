@@ -9,8 +9,11 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
-  
-  const navigate = useNavigate();
+   const [otp, setOtp] = useState(['', '', '', '', '', '']);
+   const [generatedOtp, setGeneratedOtp] = useState('');
+   const [showExistenceWarning, setShowExistenceWarning] = useState(false);
+   
+   const navigate = useNavigate();
 
   // Form State
   const [formData, setFormData] = useState({
@@ -53,8 +56,86 @@ const Signup = () => {
     setLoading(true);
     setError(null);
 
+    // 1. Validate Form First
+    if (role === 'provider' && (!files.aadhar || !files.pan || !files.photo)) {
+      setError("Please upload all provider documents.");
+      setLoading(false);
+      return;
+    }
+
+    // 2. Check if user already exists in our system (consumers or service_providers)
     try {
-      // 1. Sign up user via Auth
+      const table = role === 'consumer' ? 'consumers' : 'service_providers';
+      const { data: existing, error: checkError } = await supabase
+        .from(table)
+        .select('id')
+        .eq('email', formData.email)
+        .single();
+
+      if (existing) {
+        setShowExistenceWarning(true);
+        setError(`An account with this email already exists as a ${role}.`);
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      // If error is not a 'not found', it might be a real system error
+      if (err.code !== 'PGRST116') { // PGRST116 = no rows found
+        console.error("Check existing error:", err);
+      }
+    }
+
+    try {
+      // 3. Generate a 6 digit code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedOtp(code);
+      
+      // 3. Send that code via our Node.js server
+      const response = await fetch('http://localhost:5000/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, otp: code }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message || 'Error sending email');
+      }
+
+      // 4. Move to OTP step without registering the user yet
+      setStep(3);
+    } catch (err) {
+      setError(err.message || 'Failed to send OTP email. Please ensure the server is running.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (element, index) => {
+    if (isNaN(element.value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = element.value;
+    setOtp(newOtp);
+
+    // Focus next input
+    if (element.nextSibling && element.value) {
+      element.nextSibling.focus();
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    const enteredOtp = otp.join('');
+    if (enteredOtp !== generatedOtp) {
+      setError("Incorrect OTP. Please try again.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 1. Sign up user via Auth now that OTP is verified
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -64,13 +145,17 @@ const Signup = () => {
       const userId = authData.user.id;
       let aadhar_url = '', pan_url = '', photo_url = '';
 
-      // 2. If provider, upload documents
+      // 2. Upload documents and create profiles
       if (role === 'provider') {
         if (files.aadhar) aadhar_url = await uploadFile(files.aadhar, `${userId}/aadhar_${files.aadhar.name}`);
         if (files.pan) pan_url = await uploadFile(files.pan, `${userId}/pan_${files.pan.name}`);
         if (files.photo) photo_url = await uploadFile(files.photo, `${userId}/photo_${files.photo.name}`);
         
-        // Insert into service_providers
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: userId, name: formData.name, role: 'provider'
+        });
+        if (profileError) throw profileError;
+
         const { error: dbError } = await supabase.from('service_providers').insert({
           id: userId,
           name: formData.name, email: formData.email, phone: formData.phone,
@@ -81,9 +166,13 @@ const Signup = () => {
         });
         if (dbError) throw dbError;
 
-        setSuccessMsg("Welcome to Local services the new era of opportunities we are reviewing your profile we will shortly contact you thank you");
+        setSuccessMsg("Registration successful! Your provider profile is pending review.");
       } else {
-        // Insert into consumers
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: userId, name: formData.name, role: 'client'
+        });
+        if (profileError) throw profileError;
+
         const { error: dbError } = await supabase.from('consumers').insert({
           id: userId,
           name: formData.name, email: formData.email, phone: formData.phone,
@@ -92,8 +181,13 @@ const Signup = () => {
         });
         if (dbError) throw dbError;
 
-        setSuccessMsg("Congratulations your registration done navigating to login");
-        setTimeout(() => navigate('/login'), 3500);
+        setSuccessMsg(`Welcome ${role === 'consumer' ? 'Consumer' : 'Provider'}! Redirecting to your dashboard...`);
+
+        // 3. Log them in directly or redirect to dashboard
+        setTimeout(() => {
+          if (role === 'provider') navigate('/provider-dashboard');
+          else navigate('/dashboard');
+        }, 3000);
       }
     } catch (err) {
       setError(err.message);
@@ -101,6 +195,8 @@ const Signup = () => {
       setLoading(false);
     }
   };
+
+
 
   if (successMsg) {
     return (
@@ -118,7 +214,17 @@ const Signup = () => {
       <div className="glass-card custom-scrollbar" style={{ padding: '2.5rem', width: '100%', maxWidth: '650px', borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <h2 style={{ textAlign: 'center', marginBottom: '2rem', color: 'var(--primary)' }}>Create Account</h2>
         
-        {error && <div style={{ color: 'var(--error)', marginBottom: '1.5rem', textAlign: 'center', padding: '1rem', background: '#ffe4e6', borderRadius: 'var(--radius-sm)', fontWeight: 500 }}>{error}</div>}
+         {error && (
+           <div style={{ color: 'var(--error)', marginBottom: '1.5rem', textAlign: 'center', padding: '1rem', background: '#ffe4e6', borderRadius: 'var(--radius-sm)', fontWeight: 500 }}>
+             {error}
+             {showExistenceWarning && (
+               <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                 <button type="button" onClick={() => navigate('/login')} style={{ background: 'var(--primary)', color: 'white', padding: '0.4rem 0.8rem', borderRadius: '4px', fontSize: '0.86rem' }}>Log in Instead</button>
+                 <button type="button" onClick={() => { setShowExistenceWarning(false); setError(null); }} style={{ background: '#64748b', color: 'white', padding: '0.4rem 0.8rem', borderRadius: '4px', fontSize: '0.86rem' }}>Try Different Email</button>
+               </div>
+             )}
+           </div>
+         )}
 
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -233,6 +339,66 @@ const Signup = () => {
               <button type="submit" disabled={loading} style={{ padding: '1rem', flex: 2, background: 'var(--primary)', color: 'var(--on-primary)', borderRadius: 'var(--radius-sm)', fontWeight: 'bold', fontSize: '1rem' }} className="neon-glow-hover">
                 {loading ? 'Processing...' : 'Complete Registration'}
               </button>
+            </div>
+          </form>
+        )}
+
+        {step === 3 && (
+          <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <h3 style={{ textAlign: 'center', marginBottom: '1rem', color: 'var(--primary)' }}>Verify Your Email</h3>
+            <p style={{ textAlign: 'center', color: 'var(--secondary)' }}>
+              We have sent an OTP to <strong>{formData.email}</strong>. Please enter it below to verify your account.
+            </p>
+            
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '1rem' }}>
+              {otp.map((data, index) => (
+                <input
+                  key={index}
+                  type="text"
+                  maxLength="1"
+                  value={data}
+                  onChange={(e) => handleOtpChange(e.target, index)}
+                  onFocus={(e) => e.target.select()}
+                  style={{
+                    width: '3rem', height: '3.5rem', textAlign: 'center', fontSize: '1.5rem',
+                    borderRadius: 'var(--radius-sm)', border: '1px solid var(--outline-variant)',
+                    background: 'var(--surface-container)', color: 'var(--on-surface)'
+                  }}
+                  required
+                />
+              ))}
+            </div>
+
+            <button type="submit" disabled={loading} style={{ marginTop: '1rem', padding: '1rem', background: 'var(--primary)', color: 'var(--on-primary)', borderRadius: 'var(--radius-sm)', fontWeight: 'bold', fontSize: '1rem' }} className="neon-glow-hover">
+              {loading ? 'Verifying...' : 'Verify OTP'}
+            </button>
+            <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+               <button type="button" onClick={async () => {
+                 setLoading(true);
+                 setError(null);
+                 const code = Math.floor(100000 + Math.random() * 900000).toString();
+                 setGeneratedOtp(code);
+                 
+                 try {
+                   const response = await fetch('http://localhost:5000/send-otp', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ email: formData.email, otp: code }),
+                   });
+                   const result = await response.json();
+                   if (result.success) {
+                     alert("OTP resent to your email.");
+                   } else {
+                     setError(result.message);
+                   }
+                 } catch (err) {
+                   setError("Failed to resend OTP. Is the email server running?");
+                 } finally {
+                   setLoading(false);
+                 }
+               }} style={{ background: 'none', border: 'none', color: 'var(--tertiary)', textDecoration: 'underline', cursor: 'pointer', fontWeight: 'bold' }}>
+                 Resend OTP
+               </button>
             </div>
           </form>
         )}
