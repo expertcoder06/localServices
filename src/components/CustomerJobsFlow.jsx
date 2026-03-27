@@ -1,7 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 export default function CustomerJobsFlow() {
-  const [view, setView] = useState('bids') // bids -> bid_details -> payment -> tracking -> profile
+  const navigate = useNavigate()
+  const [view, setView] = useState('bids') // bids -> bid_details -> payment -> tracking -> profile -> feedback -> success
+  const [feedbackText, setFeedbackText] = useState('')
+  const [rating, setRating] = useState(4)
 
   /* ── VIEW 1: BIDS RECEIVED ── */
   if (view === 'bids') {
@@ -268,31 +272,31 @@ export default function CustomerJobsFlow() {
     )
   }
 
-  /* ── VIEW 5: JOB IN PROGRESS ── */
+  /* ── VIEW 5: JOB IN PROGRESS (Milestones) ── */
   if (view === 'profile') {
+    const isJobDone = true; // Simulating job is completed
     return (
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         <button className="btn btn--ghost" onClick={() => setView('tracking')} style={{ marginBottom: '1.5rem', padding: '0.5rem' }}>
           <span className="material-icons" style={{ fontSize: '1rem', marginRight: '6px', verticalAlign: 'middle' }}>arrow_back</span> Back to Tracker
         </button>
 
-        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.2rem' }}>Job In Progress</h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)', marginBottom: '2rem' }}>Job ID: #LX-99284 • Started 10 mins ago</p>
+        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.2rem' }}>{isJobDone ? 'Job Ready for Review' : 'Job In Progress'}</h1>
+        <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)', marginBottom: '2rem' }}>Job ID: #LX-99284 • {isJobDone ? 'Completed 2 mins ago' : 'Started 10 mins ago'}</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem' }}>
-          {/* Left panel: Service Progress */}
           <div style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '2rem', border: '1px solid var(--outline-variant)' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className="material-icons" style={{ color: 'var(--primary)' }}>sync</span> Service Progress
+              <span className="material-icons" style={{ color: 'var(--primary)' }}>{isJobDone ? 'task_alt' : 'sync'}</span> {isJobDone ? 'Final Status' : 'Service Progress'}
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
               {[
                 { label: 'Provider Arrived', desc: 'Verified at 09:45 AM', status: 'done' },
-                { label: 'Pre-inspection Complete', desc: '', status: 'done' },
-                { label: 'In Progress', desc: 'Working on main issue', status: 'active' },
-                { label: 'Quality Check', desc: 'Pending finish', status: 'upcoming' },
-                { label: 'Job Complete', desc: 'Awaiting your approval', status: 'upcoming' }
+                { label: 'Pre-inspection Complete', desc: 'No issues found', status: 'done' },
+                { label: 'Work Executed', desc: 'Main repair finished', status: 'done' },
+                { label: 'Quality Check', desc: 'Self-inspection passed', status: 'done' },
+                { label: 'Job Complete', desc: 'Awaiting your approval', status: isJobDone ? 'done' : 'active' }
               ].map((m, i, arr) => (
                 <div key={i} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '24px', flexShrink: 0 }}>
@@ -310,22 +314,27 @@ export default function CustomerJobsFlow() {
                   </div>
                   <div style={{ paddingBottom: i < arr.length - 1 ? '1.5rem' : 0 }}>
                     <div style={{ fontSize: '0.95rem', fontWeight: m.status === 'active' ? 700 : 600, color: m.status === 'upcoming' ? 'var(--outline)' : 'var(--on-surface)' }}>{m.label}</div>
-                    {m.desc && <div style={{ fontSize: '0.75rem', color: m.status === 'active' ? '#dd6b20' : 'var(--on-surface-variant)', marginTop: '0.2rem' }}>{m.desc}</div>}
+                    {m.desc && <div style={{ fontSize: '0.75rem', color: m.status === 'active' || (isJobDone && i === 4) ? '#38a169' : 'var(--on-surface-variant)', marginTop: '0.2rem' }}>{m.desc}</div>}
                   </div>
                 </div>
               ))}
             </div>
             
-            <div style={{ marginTop: '2.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', background: 'rgba(49,130,206,0.06)', borderRadius: 'var(--radius-md)', color: '#3182ce', fontSize: '0.8rem', fontWeight: 600 }}>
-              <span className="material-icons" style={{ fontSize: '1.2rem' }}>info</span>
-              Service Location: Your Residence
-            </div>
+            {isJobDone && (
+              <div style={{ marginTop: '2.5rem', padding: '1.5rem', background: 'rgba(56,161,105,0.08)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(56,161,105,0.2)' }}>
+                <p style={{ fontSize: '0.9rem', color: '#2f855a', fontWeight: 600, marginBottom: '1.5rem' }}>
+                  Marcus Richardson has marked the job as complete. Please inspect the work and release the payment if you're satisfied.
+                </p>
+                <button className="btn btn--primary" style={{ width: '100%', padding: '1rem', background: '#38a169' }} onClick={() => setView('feedback')}>
+                  Release Payment & Rate Work
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Right panel: Provider Profile Snippet */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%)', borderRadius: 'var(--radius-xl)', padding: '1.5rem', color: 'white', textAlign: 'center' }}>
-              <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '1.8rem', border: '2px solid rgba(255,255,255,0.3)', margin: '0 auto 1rem' }}>MT</div>
+              <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '1.8rem', border: '2px solid rgba(255,255,255,0.3)', margin: '0 auto 1rem' }}>MR</div>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.2rem' }}>Marcus Richardson</h3>
               <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)', marginBottom: '1rem' }}>Master HVAC Specialist</div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
@@ -345,6 +354,95 @@ export default function CustomerJobsFlow() {
             </div>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  /* ── VIEW 6: FEEDBACK & RATING ── */
+  if (view === 'feedback') {
+    const handleTagClick = (tag) => {
+      setFeedbackText(prev => prev ? `${prev} • ${tag}` : tag)
+    }
+
+    return (
+      <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
+        <div style={{ background: 'var(--surface-container-low)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: '#38a169' }}>
+          <span className="material-icons" style={{ fontSize: '3rem' }}>verified_user</span>
+        </div>
+        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>Payment Released!</h1>
+        <p style={{ fontSize: '0.95rem', color: 'var(--on-surface-variant)', marginBottom: '2.5rem' }}>
+          Thank you for choosing Local Services. Marcus Richardson has been paid ₹850. How was your experience?
+        </p>
+
+        <div style={{ background: '#fff', borderRadius: 'var(--radius-2xl)', padding: '2.5rem', border: '1px solid var(--outline-variant)', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', marginBottom: '2rem' }}>
+          <div style={{ marginBottom: '2rem' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '1.8rem', margin: '0 auto 1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>MR</div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Marcus Richardson</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>Master HVAC Specialist</p>
+          </div>
+
+          <div style={{ marginBottom: '2.5rem' }}>
+            <p style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--on-surface)' }}>Rate the Service</p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
+              {[1, 2, 3, 4, 5].map(star => (
+                <span 
+                  key={star} 
+                  className="material-icons" 
+                  style={{ fontSize: '2.5rem', color: star <= rating ? '#f6ad55' : 'var(--outline-variant)', cursor: 'pointer' }}
+                  onClick={() => setRating(star)}
+                >
+                  {star <= rating ? 'star' : 'star_outline'}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '2rem', textAlign: 'left' }}>
+            <label style={{ fontSize: '0.9rem', fontWeight: 700, display: 'block', marginBottom: '0.8rem', color: 'var(--on-surface)' }}>Your Feedback</label>
+            <textarea 
+              placeholder="What did you like about the work? (Optional)"
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              style={{ width: '100%', height: '120px', borderRadius: 'var(--radius-lg)', padding: '1rem', border: '1px solid var(--outline-variant)', background: 'var(--surface-container-lowest)', fontSize: '0.9rem', outline: 'none', resize: 'none' }}
+              onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+              onBlur={e => e.target.style.borderColor = 'var(--outline-variant)'}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '2.5rem', justifyContent: 'center' }}>
+            {['Punctual', 'Professional', 'Expert', 'Clean Work', 'Good Value'].map(tag => (
+              <span 
+                key={tag} 
+                onClick={() => handleTagClick(tag)}
+                style={{ fontSize: '0.75rem', padding: '0.5rem 1rem', borderRadius: '100px', border: feedbackText.includes(tag) ? '1px solid var(--primary)' : '1px solid var(--outline-variant)', background: feedbackText.includes(tag) ? 'rgba(49,130,206,0.1)' : 'white', color: feedbackText.includes(tag) ? 'var(--primary)' : 'var(--on-surface)', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+
+          <button className="btn btn--primary" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', borderRadius: 'var(--radius-lg)' }} onClick={() => setView('success')}>
+            Submit Feedback
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  /* ── VIEW 7: SUCCESS / RETURN TO HOME ── */
+  if (view === 'success') {
+    return (
+      <div style={{ maxWidth: '500px', margin: '0 auto', textAlign: 'center', padding: '4rem 2rem' }}>
+        <div style={{ background: '#38a169', width: '100px', height: '100px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem', color: 'white', boxShadow: '0 20px 40px rgba(56,161,105,0.3)' }}>
+          <span className="material-icons" style={{ fontSize: '4rem' }}>check_circle</span>
+        </div>
+        <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '1rem' }}>Great Success!</h1>
+        <p style={{ fontSize: '1rem', color: 'var(--on-surface-variant)', lineHeight: 1.6, marginBottom: '2.5rem' }}>
+          Your feedback helps us maintain a high standard of service and supports professional experts like Marcus. We hope to see you again soon!
+        </p>
+        <button className="btn btn--primary" style={{ width: '100%', padding: '1.2rem', fontSize: '1.1rem', borderRadius: 'var(--radius-xl)' }} onClick={() => navigate('/dashboard')}>
+          Return to Client Dashboard
+        </button>
       </div>
     )
   }
