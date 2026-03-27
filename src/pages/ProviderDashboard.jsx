@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import AiBiddingSystem from '../components/AiBiddingSystem'
 import JobExecutionWallet from '../components/JobExecutionWallet'
 import '../App.css'
+import ServiceProviderProfile from '../components/ServiceProviderProfile'
 
 const MOCK_REQUESTS = [
   {
@@ -74,6 +75,7 @@ const SIDEBAR_LINKS = [
   { id: 'jobs', icon: 'work', label: 'Jobs' },
   { id: 'earnings', icon: 'payments', label: 'Earnings' },
   { id: 'insights', icon: 'insights', label: 'Insights' },
+  { id: 'profile', icon: 'person', label: 'Profile' },
   { id: 'support', icon: 'help', label: 'Support' },
 ]
 
@@ -171,7 +173,7 @@ export default function ProviderDashboard() {
               <button className="btn btn--ghost" style={{ borderRadius: '50%', padding: '0.4rem' }}>
                 <span className="material-icons">notifications</span>
               </button>
-              <div className="dashboard-avatar" style={{ background: 'var(--tertiary)', color: 'white' }}>AL</div>
+              <div className="dashboard-avatar" style={{ background: 'var(--tertiary)', color: 'white', cursor: 'pointer' }} onClick={() => setActiveTab('profile')}>AL</div>
             </div>
           </div>
 
@@ -229,7 +231,10 @@ export default function ProviderDashboard() {
         )}
 
         {/* Grid — Dashboard Tab */}
-        {!activeJob && activeTab !== 'jobs' && (<div className="dashboard-grid">
+        {!activeJob && activeTab === 'profile' && (
+          <ServiceProviderProfile isEditable={true} />
+        )}
+        {!activeJob && activeTab !== 'jobs' && activeTab !== 'profile' && (<div className="dashboard-grid">
           {/* Left Column */}
           <div className="dashboard-col-left">
 

@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import '../App.css'
 import PostRequestFlow from '../components/PostRequestFlow'
 import CustomerJobsFlow from '../components/CustomerJobsFlow'
+import UserProfile from '../components/UserProfile'
 
 const generateMockData = () => {
   const roles = [
@@ -87,6 +88,7 @@ export default function CustomerDashboard() {
     { id: 'bookings', icon: 'event', label: 'My Bookings' },
     { id: 'chats', icon: 'chat', label: 'Chats' },
     { id: 'favorites', icon: 'favorite', label: 'Favorites' },
+    { id: 'profile', icon: 'person', label: 'Profile' },
   ]
 
   const services = [
@@ -172,7 +174,7 @@ export default function CustomerDashboard() {
                   </span>
                 )}
               </div>
-              <div className="dashboard-avatar">AL</div>
+              <div className="dashboard-avatar" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('profile')}>AL</div>
             </div>
           </div>
 
@@ -225,7 +227,9 @@ export default function CustomerDashboard() {
         {showPostRequest && <PostRequestFlow onClose={() => setShowPostRequest(false)} />}
 
         {/* Main View Area */}
-        {activeTab === 'bookings' ? (
+        {activeTab === 'profile' ? (
+          <UserProfile />
+        ) : activeTab === 'bookings' ? (
           <div style={{ padding: '0 0.5rem', animation: 'fadeIn 0.3s' }}>
             <CustomerJobsFlow />
           </div>
