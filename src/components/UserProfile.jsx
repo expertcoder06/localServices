@@ -1,19 +1,57 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { supabase } from '../utils/supabaseClient'
 
-export default function UserProfile({ user = {} }) {
+export default function UserProfile() {
   const [isEditing, setIsEditing] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [userData, setUserData] = useState({
-    fullName: user.fullName || 'Alex Rivera',
-    email: user.email || 'alex.rivera@example.com',
-    phone: user.phone || '+91 98765 43210',
-    location: user.location || 'Sector 21, Gurgaon, Haryana',
-    profilePic: user.profilePic || null,
-    status: user.status || 'Verified',
-    joinedDate: user.joinedDate || 'March 2024',
-    ...user
+    fullName: '',
+    email: '',
+    phone: '',
+    location: '',
+    profilePic: null,
+    status: 'Verified',
+    joinedDate: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
   })
 
   const [tempData, setTempData] = useState({ ...userData })
+
+  useEffect(() => {
+    fetchUserProfile()
+  }, [])
+
+  const fetchUserProfile = async () => {
+    try {
+      setLoading(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // Fetch from consumers table
+        const { data: consumer, error } = await supabase
+          .from('consumers')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        if (consumer) {
+          const profileData = {
+            fullName: consumer.name || 'User Name',
+            email: user.email || '',
+            phone: consumer.phone || '',
+            location: consumer.location || 'Add your location here',
+            profilePic: consumer.profile_pic || null,
+            status: consumer.status || 'Verified',
+            joinedDate: new Date(consumer.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+          }
+          setUserData(profileData)
+          setTempData(profileData)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleFileChange = (e) => {
     const file = e.target.files[0]
@@ -26,7 +64,33 @@ export default function UserProfile({ user = {} }) {
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const updatePayload = {
+          name: tempData.fullName,
+          phone: tempData.phone,
+          location: tempData.location,
+        }
+        
+        // Add profile_pic if we have one (base64 string)
+        if (tempData.profilePic) {
+          updatePayload.profile_pic = tempData.profilePic
+        }
+
+        const { error } = await supabase
+          .from('consumers')
+          .update(updatePayload)
+          .eq('id', user.id)
+
+        if (error) {
+          console.error("Error updating profile in db (profile_pic column may not exist). Proceeding visually based on local state:", error)
+        }
+      }
+    } catch (err) {
+      console.error('Error saving profile:', err)
+    }
     setUserData({ ...tempData })
     setIsEditing(false)
   }
@@ -37,6 +101,15 @@ export default function UserProfile({ user = {} }) {
     { title: 'Leakage Repair', provider: 'Karan Singh', date: 'Sep 05, 2025', amount: '₹450', status: 'Completed' },
   ]
 
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '3rem' }}>
+        <span className="material-icons animate-spin" style={{ fontSize: '2rem', color: 'var(--primary)' }}>sync</span>
+        <p style={{ marginTop: '1rem', color: 'var(--on-surface-variant)' }}>Loading profile...</p>
+      </div>
+    )
+  }
+
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', animation: 'fadeIn 0.4s ease-out', paddingBottom: '3rem' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '2rem' }}>
@@ -46,7 +119,11 @@ export default function UserProfile({ user = {} }) {
           <div style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '2rem', border: '1px solid var(--outline-variant)', textAlign: 'center', position: 'relative' }}>
             <div style={{ position: 'relative', width: '120px', height: '120px', margin: '0 auto 1.5rem' }}>
               <div style={{ width: '120px', height: '120px', borderRadius: '50%', background: 'var(--tertiary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', fontWeight: 800, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', border: '4px solid #fff', overflow: 'hidden' }}>
-                {(isEditing ? tempData.profilePic : userData.profilePic) ? <img src={isEditing ? tempData.profilePic : userData.profilePic} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (isEditing ? tempData.fullName : userData.fullName).split(' ').map(n => n[0]).join('')}
+                {(isEditing ? tempData.profilePic : userData.profilePic) ? (
+                  <img src={isEditing ? tempData.profilePic : userData.profilePic} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  ((isEditing ? tempData.fullName : userData.fullName) || 'User').split(' ').map(n => n?.[0]).join('').substring(0,2).toUpperCase()
+                )}
               </div>
               {isEditing && (
                 <label style={{ position: 'absolute', bottom: '0', right: '0', background: 'var(--primary)', color: 'white', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '3px solid #fff', boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}>
@@ -62,6 +139,7 @@ export default function UserProfile({ user = {} }) {
                 value={tempData.fullName} 
                 onChange={e => setTempData({...tempData, fullName: e.target.value})}
                 style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--primary)', fontSize: '1.2rem', fontWeight: 700, textAlign: 'center', marginBottom: '0.5rem', outline: 'none' }}
+                placeholder="Full Name"
               />
             ) : (
               <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.4rem' }}>{userData.fullName}</h2>
@@ -79,11 +157,21 @@ export default function UserProfile({ user = {} }) {
                   <div style={{ color: 'var(--on-surface)' }}>{userData.email}</div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', opacity: isEditing ? 0.6 : 1 }}>
+              <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', opacity: isEditing ? 1 : 1 }}>
                 <span className="material-icons" style={{ color: 'var(--outline)', fontSize: '1.2rem' }}>call</span>
-                <div style={{ fontSize: '0.85rem' }}>
-                  <div style={{ color: 'var(--on-surface-variant)', fontWeight: 600 }}>Phone Number <span style={{ fontSize: '0.65rem', fontWeight: 400 }}>(Protected)</span></div>
-                  <div style={{ color: 'var(--on-surface)' }}>{userData.phone}</div>
+                <div style={{ fontSize: '0.85rem', flex: 1 }}>
+                  <div style={{ color: 'var(--on-surface-variant)', fontWeight: 600 }}>Phone Number <span style={{ fontSize: '0.65rem', fontWeight: 400 }}>{isEditing ? '' : '(Protected)'}</span></div>
+                  {isEditing ? (
+                    <input 
+                      type="text" 
+                      value={tempData.phone} 
+                      onChange={e => setTempData({...tempData, phone: e.target.value})}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--primary)', fontSize: '0.85rem', marginTop: '0.3rem', outline: 'none' }}
+                      placeholder="Phone Number"
+                    />
+                  ) : (
+                    <div style={{ color: 'var(--on-surface)' }}>{userData.phone || 'Not provided'}</div>
+                  )}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
@@ -95,6 +183,7 @@ export default function UserProfile({ user = {} }) {
                       value={tempData.location} 
                       onChange={e => setTempData({...tempData, location: e.target.value})}
                       style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--primary)', fontSize: '0.85rem', marginTop: '0.3rem', outline: 'none', resize: 'none', height: '60px' }}
+                      placeholder="Your Address"
                     />
                   ) : (
                     <div style={{ color: 'var(--on-surface)' }}>{userData.location}</div>
@@ -113,19 +202,6 @@ export default function UserProfile({ user = {} }) {
             )}
           </div>
 
-          <div style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%)', borderRadius: 'var(--radius-xl)', padding: '1.5rem', color: 'white' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: 'white' }}>Security Status</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>Two-Factor Auth</span>
-                <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '100px' }}>Enabled</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>Identity Proof</span>
-                <span style={{ fontSize: '0.7rem', background: 'rgba(56,161,105,0.3)', padding: '2px 8px', borderRadius: '100px' }}>Verified</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Right Column: Detailed Tabs/Sections */}

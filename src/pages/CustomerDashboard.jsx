@@ -5,6 +5,7 @@ import '../App.css'
 import PostRequestFlow from '../components/PostRequestFlow'
 import CustomerJobsFlow from '../components/CustomerJobsFlow'
 import UserProfile from '../components/UserProfile'
+import { supabase } from '../utils/supabaseClient'
 
 // generateMockData removed in favor of real database fetching
 
@@ -14,16 +15,49 @@ export default function CustomerDashboard() {
   const [searchQuery, setSearchQuery] = useState(navLocation.state?.searchQuery || '')
   const [minRating, setMinRating] = useState(0)
   const [minTrustScore, setMinTrustScore] = useState(0)
+  const [maxRadius, setMaxRadius] = useState(1)
+
+  // Sync search query when location state changes (e.g. chatbot navigation)
+  useEffect(() => {
+    if (navLocation.state?.searchQuery) {
+      setSearchQuery(navLocation.state.searchQuery)
+      setActiveTab('dashboard')
+    }
+  }, [navLocation.state?.searchQuery, navLocation.key])
 
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [showPostRequest, setShowPostRequest] = useState(false)
+  const [userName, setUserName] = useState('User')
+  const [userInitials, setUserInitials] = useState('U')
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: consumer } = await supabase.from('consumers').select('name').eq('id', user.id).maybeSingle()
+        if (consumer && consumer.name) {
+          setUserName(consumer.name)
+          const nameParts = consumer.name.split(' ')
+          const initials = nameParts.length > 1 
+            ? nameParts[0][0] + nameParts[1][0] 
+            : nameParts[0][0]
+          setUserInitials(initials.toUpperCase())
+        }
+      }
+    }
+    fetchUser()
+  }, [])
 
   const sidebarLinks = [
     { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
     { id: 'bookings', icon: 'event', label: 'My Bookings' },
-    { id: 'chats', icon: 'chat', label: 'Chats' },
-    { id: 'favorites', icon: 'favorite', label: 'Favorites' },
     { id: 'profile', icon: 'person', label: 'Profile' },
   ]
 
@@ -66,7 +100,7 @@ export default function CustomerDashboard() {
 
   const allProfessionals = professionals
 
-  const isFiltering = searchQuery || minRating > 0 || minTrustScore > 0
+  const isFiltering = searchQuery || minRating > 0 || minTrustScore > 0 || maxRadius > 1
 
   const filteredProfessionals = allProfessionals.filter(pro => {
     const query = searchQuery.toLowerCase();
@@ -75,8 +109,9 @@ export default function CustomerDashboard() {
       pro.location.toLowerCase().includes(query);
     const matchesRating = pro.rating >= minRating;
     const matchesTrust = pro.trustScore >= minTrustScore;
+    const matchesRadius = pro.distance <= maxRadius;
 
-    return matchesSearch && matchesRating && matchesTrust;
+    return matchesSearch && matchesRating && matchesTrust && matchesRadius;
   })
 
   return (
@@ -102,18 +137,23 @@ export default function CustomerDashboard() {
         </nav>
 
         <div className="dashboard-sidebar__bottom">
-          <Link to="/" className="btn btn--outline" style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem' }}>
-            <span className="material-icons" style={{ fontSize: '1rem', marginRight: '4px' }}>logout</span> Back to Home
-          </Link>
+          <button 
+            className="btn btn--outline" 
+            style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', cursor: 'pointer', textAlign: 'center' }}
+            onClick={() => setShowLogoutConfirm(true)}
+          >
+            <span className="material-icons" style={{ fontSize: '1rem', marginRight: '4px', verticalAlign: 'middle' }}>logout</span> Log out
+          </button>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="dashboard-main">
+        {activeTab !== 'profile' && (
         <header className="dashboard-header" style={{ flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start' }}>
             <div>
-              <h1 className="dashboard-title">Good Morning, Alex</h1>
+              <h1 className="dashboard-title">Hello, {userName}</h1>
               <p className="dashboard-subtitle">
                 <span style={{ color: '#dd6b20', marginRight: '6px' }}>🔥</span>
                 {allProfessionals.length} helpers available nearby
@@ -140,35 +180,42 @@ export default function CustomerDashboard() {
                   </span>
                 )}
               </div>
-              <div className="dashboard-avatar" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('profile')}>AL</div>
+              <div className="dashboard-avatar" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('profile')}>{userInitials}</div>
             </div>
           </div>
 
           {/* Filtering Metrics */}
-          <div className="dashboard-header__filters" style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', background: '#fff', padding: '0.8rem 1.5rem', borderRadius: '100px', border: '1px solid var(--outline-variant)', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--on-surface-variant)', width: '110px' }}>Min Rating: {minRating} <span className="material-icons" style={{ fontSize: '0.9rem', color: '#d69e2e', verticalAlign: 'middle' }}>star</span></label>
-              <input type="range" min="0" max="5" step="0.5" value={minRating} onChange={e => setMinRating(Number(e.target.value))} style={{ width: '120px', cursor: 'pointer' }} />
-            </div>
-            <div style={{ width: '1px', height: '24px', background: 'var(--outline-variant)' }}></div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--on-surface-variant)', width: '140px' }}>Min Trust Score: {minTrustScore}</label>
-              <input type="range" min="0" max="10" step="0.5" value={minTrustScore} onChange={e => setMinTrustScore(Number(e.target.value))} style={{ width: '120px', cursor: 'pointer' }} />
-            </div>
+          {activeTab === 'dashboard' && (
+            <div className="dashboard-header__filters" style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', background: '#fff', padding: '0.8rem 1.5rem', borderRadius: '100px', border: '1px solid var(--outline-variant)', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--on-surface-variant)', width: '110px' }}>Min Rating: {minRating} <span className="material-icons" style={{ fontSize: '0.9rem', color: '#d69e2e', verticalAlign: 'middle' }}>star</span></label>
+                <input type="range" min="0" max="5" step="0.5" value={minRating} onChange={e => setMinRating(Number(e.target.value))} style={{ width: '120px', cursor: 'pointer' }} />
+              </div>
+              <div style={{ width: '1px', height: '24px', background: 'var(--outline-variant)' }}></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--on-surface-variant)', width: '140px' }}>Min Trust Score: {minTrustScore}</label>
+                <input type="range" min="0" max="10" step="0.5" value={minTrustScore} onChange={e => setMinTrustScore(Number(e.target.value))} style={{ width: '120px', cursor: 'pointer' }} />
+              </div>
+              <div style={{ width: '1px', height: '24px', background: 'var(--outline-variant)' }}></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--on-surface-variant)', width: '110px' }}>Max Radius: {maxRadius}km</label>
+                <input type="range" min="1" max="20" step="1" value={maxRadius} onChange={e => setMaxRadius(Number(e.target.value))} style={{ width: '120px', cursor: 'pointer' }} />
+              </div>
 
-            {isFiltering && (
               <button
                 className="btn btn--ghost"
-                style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem', height: 'fit-content', marginLeft: 'auto', border: '1px solid var(--outline)' }}
-                onClick={() => { setSearchQuery(''); setMinRating(0); setMinTrustScore(0); }}
+                style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem', height: 'fit-content', marginLeft: 'auto', border: '1px solid var(--outline)', opacity: isFiltering ? 1 : 0.5, pointerEvents: isFiltering ? 'auto' : 'none' }}
+                onClick={() => { setSearchQuery(''); setMinRating(0); setMinTrustScore(0); setMaxRadius(1); }}
               >
                 Clear Filters
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </header>
+        )}
 
         {/* Post a Request Button */}
+        {activeTab !== 'profile' && (
         <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '0.5rem' }}>
           <button
             id="post-request-btn"
@@ -188,6 +235,7 @@ export default function CustomerDashboard() {
             Post a Request
           </button>
         </div>
+        )}
 
         {/* Modal: Post Request */}
         {showPostRequest && <PostRequestFlow onClose={() => setShowPostRequest(false)} />}
@@ -222,7 +270,7 @@ export default function CustomerDashboard() {
                       <p style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', marginBottom: '0.2rem' }}>{pro.role}</p>
                       <p style={{ fontSize: '0.75rem', color: 'var(--outline)', marginBottom: '0.5rem' }}>
                         <span className="material-icons" style={{ fontSize: '0.8rem', verticalAlign: 'middle', marginRight: '2px' }}>location_on</span>
-                        {pro.location}
+                        {pro.location} &middot; {pro.distance} km away
                       </p>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -252,7 +300,7 @@ export default function CustomerDashboard() {
               <div style={{ textAlign: 'center', padding: '3rem', background: '#fff', borderRadius: 'var(--radius-lg)' }}>
                 <span className="material-icons" style={{ fontSize: '3rem', color: 'var(--outline-variant)', marginBottom: '1rem' }}>search_off</span>
                 <p style={{ color: 'var(--on-surface-variant)' }}>No professionals found matching your filters.</p>
-                <button className="btn btn--outline" style={{ marginTop: '1rem' }} onClick={() => { setSearchQuery(''); setMinRating(0); setMinTrustScore(0); }}>Clear Filters</button>
+                <button className="btn btn--outline" style={{ marginTop: '1rem' }} onClick={() => { setSearchQuery(''); setMinRating(0); setMinTrustScore(0); setMaxRadius(1); }}>Clear Filters</button>
               </div>
             )}
           </div>
@@ -448,6 +496,21 @@ export default function CustomerDashboard() {
           </div>
         )}
       </main>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: '#fff', padding: '2rem', borderRadius: 'var(--radius-xl)', maxWidth: '400px', width: '90%', textAlign: 'center', animation: 'fadeIn 0.2s ease-out' }}>
+            <span className="material-icons" style={{ fontSize: '3rem', color: '#e53e3e', marginBottom: '1rem' }}>logout</span>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.5rem' }}>Confirm Logout</h2>
+            <p style={{ color: 'var(--on-surface-variant)', marginBottom: '2rem' }}>Are you sure you want to log out of your account?</p>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn btn--ghost" style={{ flex: 1, padding: '0.8rem' }} onClick={() => setShowLogoutConfirm(false)}>Cancel</button>
+              <button className="btn btn--primary" style={{ flex: 1, padding: '0.8rem', background: '#e53e3e' }} onClick={handleLogout}>Log Out</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

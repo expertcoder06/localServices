@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../utils/supabaseClient'
 
 const CATEGORIES = [
@@ -14,6 +14,7 @@ const CATEGORIES = [
   { icon: 'camera_indoor',     label: 'CCTV / Security', color: '#e53e3e' },
   { icon: 'local_dining',      label: 'Catering',        color: '#d69e2e' },
   { icon: 'spa',               label: 'Yoga / Wellness', color: '#3182ce' },
+  { icon: 'more_horiz',        label: 'Others',          color: '#718096' },
 ]
 
 const RECENT = ['Home Renovation', 'Gardening']
@@ -102,6 +103,7 @@ export default function PostRequestFlow({ onClose }) {
     title: '',
     description: '',
     photos: false,
+    audio: false,
     budgetMin: '',
     budgetMax: '',
     timeline: 'flexible',
@@ -162,6 +164,46 @@ export default function PostRequestFlow({ onClose }) {
   }
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      const chunks = []
+      recorder.ondataavailable = e => {
+        if (e.data.size > 0) chunks.push(e.data)
+      }
+      recorder.onstop = () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' })
+        const audioUrl = URL.createObjectURL(audioBlob)
+        update('audio', audioUrl)
+      }
+      recorder.start()
+      setMediaRecorder(recorder)
+      setIsRecording(true)
+    } catch (err) {
+      console.error("Microphone permission denied", err)
+      alert("Microphone access is required to record audio.")
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop()
+      mediaRecorder.stream.getTracks().forEach(track => track.stop())
+    }
+    setIsRecording(false)
+  }
+
+  // Cleanup microphone on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop()
+        mediaRecorder.stream.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [mediaRecorder])
 
   const inputStyle = {
     width: '100%', padding: '0.65rem 0.9rem', fontSize: '0.88rem',
@@ -273,17 +315,44 @@ export default function PostRequestFlow({ onClose }) {
       </div>
 
       <div style={{ marginBottom: '1.5rem' }}>
-        <label style={labelStyle}>Photos / Attachments</label>
-        <div
-          style={{ border: '2px dashed var(--outline-variant)', borderRadius: 'var(--radius-md)', padding: '1.5rem', textAlign: 'center', cursor: 'pointer', background: form.photos ? 'rgba(56,161,105,0.05)' : '#fafafa' }}
-          onClick={() => update('photos', !form.photos)}
-        >
-          <span className="material-icons" style={{ color: form.photos ? '#38a169' : 'var(--outline)', fontSize: '1.8rem', marginBottom: '0.3rem', display: 'block' }}>
-            {form.photos ? 'check_circle' : 'add_photo_alternate'}
-          </span>
-          <span style={{ fontSize: '0.78rem', color: 'var(--on-surface-variant)' }}>
-            {form.photos ? 'Photo attached ✓' : 'Tap to attach a photo (optional)'}
-          </span>
+        <label style={labelStyle}>Attachments (Optional)</label>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          
+          {/* Photos */}
+          <div style={{ flex: 1, position: 'relative' }}>
+            <input type="file" accept="image/*" id="photo-upload" hidden onChange={(e) => {
+               if(e.target.files[0]) update('photos', e.target.files[0].name)
+            }} />
+            <label htmlFor="photo-upload"
+              style={{ display: 'block', border: '2px dashed var(--outline-variant)', borderRadius: 'var(--radius-md)', padding: '1.5rem', textAlign: 'center', cursor: 'pointer', background: form.photos ? 'rgba(56,161,105,0.05)' : '#fafafa', height: '100%' }}
+            >
+              <span className="material-icons" style={{ color: form.photos ? '#38a169' : 'var(--outline)', fontSize: '1.8rem', marginBottom: '0.3rem', display: 'block' }}>
+                {form.photos ? 'image' : 'add_photo_alternate'}
+              </span>
+              <span style={{ fontSize: '0.78rem', color: 'var(--on-surface-variant)', wordBreak: 'break-word', display: 'block', lineHeight: 1.3 }}>
+                {form.photos ? `Attached: ${form.photos}` : 'Upload photo'}
+              </span>
+            </label>
+            {form.photos && <span className="material-icons" style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '1.2rem', color: '#e53e3e', cursor: 'pointer' }} onClick={(e) => { e.preventDefault(); update('photos', false); }}>cancel</span>}
+          </div>
+
+          {/* Audio */}
+          <div style={{ flex: 1, position: 'relative' }}>
+            <div
+              style={{ height: '100%', border: '2px dashed var(--outline-variant)', borderRadius: 'var(--radius-md)', padding: '1.5rem', textAlign: 'center', cursor: form.audio ? 'default' : 'pointer', background: isRecording ? 'rgba(229,62,62,0.05)' : form.audio ? 'rgba(56,161,105,0.05)' : '#fafafa' }}
+              onClick={form.audio ? null : isRecording ? stopRecording : startRecording}
+            >
+              <span className="material-icons" style={{ color: isRecording ? '#e53e3e' : form.audio ? '#38a169' : 'var(--outline)', fontSize: '1.8rem', marginBottom: '0.3rem', display: 'block', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
+                {isRecording ? 'stop_circle' : form.audio ? 'library_music' : 'mic'}
+              </span>
+              <span style={{ fontSize: '0.78rem', color: 'var(--on-surface-variant)', lineHeight: 1.3, display: 'block' }}>
+                {isRecording ? 'Recording... Tap to stop' : form.audio ? 'Voice message ready' : 'Tap to record audio'}
+              </span>
+            </div>
+            {form.audio && <span className="material-icons" style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '1.2rem', color: '#e53e3e', cursor: 'pointer' }} onClick={(e) => { e.preventDefault(); update('audio', false); }}>cancel</span>}
+            {form.audio && <audio src={form.audio} controls style={{ width: '100%', marginTop: '0.5rem', height: '30px' }} />}
+          </div>
+
         </div>
       </div>
 
@@ -462,12 +531,36 @@ export default function PostRequestFlow({ onClose }) {
         <button className="btn btn--ghost" onClick={() => setStep(4)} style={{ fontSize: '0.85rem' }}>← Back</button>
         <button
           className="btn btn--primary"
-          onClick={handlePublish}
           disabled={isPublishing}
+          onClick={async () => {
+            setIsPublishing(true)
+            try {
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) throw new Error('User not found')
+
+              const { error } = await supabase.from('jobs').insert([{
+                consumer_id: user.id,
+                title: form.title,
+                description: form.description,
+                category: form.service,
+                location: form.location,
+                budget: parseFloat(form.budgetMax) || 0,
+                status: 'pending'
+              }])
+
+              if (error) throw error
+              setStep(6)
+            } catch (err) {
+              console.error('Error publishing job:', err)
+              alert('Failed to publish request. Please try again.')
+            } finally {
+              setIsPublishing(false)
+            }
+          }}
           style={{ fontSize: '0.85rem', background: 'linear-gradient(135deg, #dd6b20, #e53e3e)', border: 'none', fontWeight: 700, padding: '0.6rem 1.4rem', opacity: isPublishing ? 0.7 : 1 }}
         >
           <span className="material-icons" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '4px' }}>
-            {isPublishing ? 'hourglass_empty' : 'send'}
+            {isPublishing ? 'sync' : 'send'}
           </span>
           {isPublishing ? 'Publishing...' : 'Publish Request'}
         </button>
@@ -563,6 +656,7 @@ export default function PostRequestFlow({ onClose }) {
       <style>{`
         @keyframes slideUp { from { opacity:0; transform:translateY(24px) } to { opacity:1; transform:translateY(0) } }
         @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
       `}</style>
       <ModalShell step={step} onClose={step === 6 ? onClose : undefined}>
         {STEP_CONTENT[step]}

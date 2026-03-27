@@ -208,66 +208,31 @@ export default function CustomerJobsFlow() {
     )
   }
 
-  /* ── VIEW 2: BID DETAILS ── */
-  if (view === 'bid_details') {
-    return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <button className="btn btn--ghost" onClick={() => setView('bids')} style={{ marginBottom: '1.5rem', padding: '0.5rem' }}>
-          <span className="material-icons" style={{ fontSize: '1rem', marginRight: '6px', verticalAlign: 'middle' }}>arrow_back</span> Back to Bids
-        </button>
+  const fetchBids = async (jobId) => {
+    try {
+      const { data, error } = await supabase
+        .from('bids')
+        .select(`
+          *,
+          provider:service_providers(id, name, role, email, trust_score)
+        `)
+        .eq('job_id', jobId)
+        .order('created_at', { ascending: false })
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Provider Card */}
-          <div style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%)', borderRadius: 'var(--radius-xl)', padding: '2rem', color: 'white', display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '1.8rem', border: '2px solid rgba(255,255,255,0.3)' }}>
-              {selectedBid.service_providers?.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '??'}
-            </div>
-            <div>
-              <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '0.3rem' }}>{selectedBid.service_providers?.name || 'Marcus Thorne'}</h1>
-              <div style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span className="material-icons" style={{ fontSize: '1.1rem', color: '#f6ad55' }}>verified</span> {selectedBid.service_providers?.categories?.[0] || 'Professional Specialist'}
-              </div>
-            </div>
-          </div>
-
-          {/* Bid details */}
-          <div style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '1.5rem', border: '1px solid var(--outline-variant)' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Proposal Details</h3>
-            <p style={{ fontSize: '0.9rem', color: 'var(--on-surface-variant)', lineHeight: 1.6, fontStyle: 'italic', marginBottom: '1.5rem', padding: '1rem', background: 'var(--surface-container-low)', borderRadius: 'var(--radius-md)' }}>
-              "I can fix your plumbing issue quickly using high-quality parts. I have all the materials ready and can arrive during your preferred time window."
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', borderTop: '1px solid var(--outline-variant)', paddingTop: '1.5rem' }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', marginBottom: '0.2rem' }}>Total Cost</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--primary)' }}>₹{selectedBid.amount}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', marginBottom: '0.2rem' }}>Estimated Duration</div>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--on-surface)' }}>2-3 Hours</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment protection */}
-          <div style={{ background: 'rgba(56,161,105,0.06)', borderRadius: 'var(--radius-md)', padding: '1.5rem', border: '1px solid rgba(56,161,105,0.2)', display: 'flex', gap: '1rem' }}>
-            <span className="material-icons" style={{ color: '#38a169', fontSize: '1.8rem' }}>security</span>
-            <div>
-              <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.3rem' }}>Payment Protection</h4>
-              <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>Funds are held securely in escrow and only released when you're 100% satisfied with the job.</p>
-            </div>
-          </div>
-
-          <button className="btn btn--primary" style={{ fontSize: '1.1rem', padding: '1rem' }} onClick={() => setView('payment')}>
-            Proceed to Payment
-          </button>
-        </div>
-      </div>
-    )
+      if (error) throw error
+      setBids(data || [])
+    } catch (err) {
+      console.error('Error fetching bids:', err)
+    }
   }
 
-  /* ── VIEW 3: PAYMENT CONFIRMATION ── */
-  if (view === 'payment') {
+  const handleJobClick = async (job) => {
+    setSelectedJob(job)
+    await fetchBids(job.id)
+    setView('bid_list')
+  }
+
+  if (loading) {
     return (
       <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>Payment Summary</h1>
@@ -324,259 +289,147 @@ export default function CustomerJobsFlow() {
     )
   }
 
-  /* ── VIEW 4: JOB STATUS TRACKER ── */
-  if (view === 'tracking') {
+  /* ── VIEW 0: JOB LIST ── */
+  if (view === 'job_list') {
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '1.5rem' }}>Job Status</h1>
-
-        <div style={{ display: 'flex', gap: '1.5rem' }}>
-          {/* Left panel */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%)', borderRadius: 'var(--radius-xl)', padding: '1.5rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.2rem' }}>Marcus Thorne</h3>
-                <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)' }}>Plumbing Specialist</div>
-              </div>
+      <div style={{ maxWidth: '800px', margin: '0 auto', animation: 'fadeIn 0.3s' }}>
+        <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '1.5rem' }}>My Service Requests</h1>
+        
+        {jobs.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '4rem 2rem', background: '#fff', borderRadius: 'var(--radius-xl)', border: '1px solid var(--outline-variant)' }}>
+            <span className="material-icons" style={{ fontSize: '4rem', color: 'var(--outline-variant)', marginBottom: '1.5rem' }}>assignment_late</span>
+            <h3 style={{ fontSize: '1.2rem', color: 'var(--on-surface)', marginBottom: '0.5rem' }}>No Requests Yet</h3>
+            <p style={{ color: 'var(--on-surface-variant)', marginBottom: '2rem' }}>You haven't posted any service requests yet.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {jobs.map(job => (
               <div 
-                style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid rgba(255,255,255,0.4)', transition: 'transform 0.2s' }}
-                onClick={() => setView('profile')}
-                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
-                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-                title="Click to view detailed progress"
+                key={job.id} 
+                onClick={() => handleJobClick(job)}
+                style={{ 
+                  background: '#fff', borderRadius: 'var(--radius-lg)', padding: '1.2rem 1.5rem', 
+                  border: '1px solid var(--outline-variant)', cursor: 'pointer',
+                  transition: 'transform 0.15s, box-shadow 0.15s',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}
               >
-                MT
-              </div>
-            </div>
-
-            <div style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '1.5rem', border: '1px solid var(--outline-variant)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, marginBottom: '1rem' }}>Arrival Estimate</div>
-              <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#dd6b20', marginBottom: '0.5rem', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                12 <span style={{ fontSize: '1.2rem', color: 'var(--on-surface-variant)' }}>mins</span>
-              </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span className="material-icons" style={{ fontSize: '1.1rem', color: '#38a169' }}>directions_car</span>
-                Provider is on the way (Light Traffic on I-35)
-              </p>
-            </div>
-
-            <div style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '1.5rem', border: '1px solid var(--outline-variant)' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Job Summary</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}><span style={{ color: 'var(--on-surface-variant)' }}>Service ID</span><strong>#LX-99284</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}><span style={{ color: 'var(--on-surface-variant)' }}>Amount Paid</span><strong style={{ color: '#38a169' }}>₹850 (In Escrow)</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}><span style={{ color: 'var(--on-surface-variant)' }}>Destination</span><strong>Your Home</strong></div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right panel - Map */}
-          <div style={{ flex: 1, background: 'var(--surface-container-low)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--outline-variant)', overflow: 'hidden', position: 'relative' }}>
-            <div style={{ position: 'absolute', top: '20px', left: '20px', background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', padding: '0.4rem 0.8rem', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700, boxShadow: 'var(--shadow-sm)' }}>
-              <span className="material-icons" style={{ color: '#e53e3e', fontSize: '1rem' }}>my_location</span>
-              Live Tracking
-            </div>
-            
-            {/* Fake map UI */}
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem', background: '#e0e3e5' }}>
-              <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, opacity: 0.1 }}>
-                <path d="M0 20 Q 30 50, 60 10 T 100 80" stroke="var(--primary)" strokeWidth="2" fill="none" />
-                <path d="M-10 80 Q 40 40, 80 90 T 110 30" stroke="var(--primary)" strokeWidth="1.5" fill="none" />
-                <path d="M20 0 Q 50 20, 30 70 T 80 110" stroke="#dd6b20" strokeWidth="2" fill="none" />
-              </svg>
-              <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', transform: 'translateY(30px) translateX(-40px)' }}>
-                <div style={{ background: '#2d476f', padding: '0.3rem 0.6rem', borderRadius: '4px', color: 'white', fontSize: '0.6rem', fontWeight: 700, marginBottom: '0.3rem', position: 'relative' }}>
-                  Marcus
-                  <div style={{ position: 'absolute', bottom: '-4px', left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '4px solid #2d476f' }} />
-                </div>
-                <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'white', border: '3px solid var(--primary)', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--primary)' }} />
-                </div>
-              </div>
-              
-              <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', transform: 'translateY(-20px) translateX(40px)' }}>
-                <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(229,62,62,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#e53e3e', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
-                </div>
-                <div style={{ fontSize: '0.65rem', fontWeight: 700, marginTop: '0.3rem', color: '#181c1e', textShadow: '0 1px 2px white' }}>Your Home</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  /* ── VIEW 5: JOB IN PROGRESS (Milestones) ── */
-  if (view === 'profile') {
-    const isJobDone = true; // Simulating job is completed
-    return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <button className="btn btn--ghost" onClick={() => setView('tracking')} style={{ marginBottom: '1.5rem', padding: '0.5rem' }}>
-          <span className="material-icons" style={{ fontSize: '1rem', marginRight: '6px', verticalAlign: 'middle' }}>arrow_back</span> Back to Tracker
-        </button>
-
-        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.2rem' }}>{isJobDone ? 'Job Ready for Review' : 'Job In Progress'}</h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)', marginBottom: '2rem' }}>Job ID: #LX-99284 • {isJobDone ? 'Completed 2 mins ago' : 'Started 10 mins ago'}</p>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem' }}>
-          <div style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '2rem', border: '1px solid var(--outline-variant)' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className="material-icons" style={{ color: 'var(--primary)' }}>{isJobDone ? 'task_alt' : 'sync'}</span> {isJobDone ? 'Final Status' : 'Service Progress'}
-            </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-              {[
-                { label: 'Provider Arrived', desc: 'Verified at 09:45 AM', status: 'done' },
-                { label: 'Pre-inspection Complete', desc: 'No issues found', status: 'done' },
-                { label: 'Work Executed', desc: 'Main repair finished', status: 'done' },
-                { label: 'Quality Check', desc: 'Self-inspection passed', status: 'done' },
-                { label: 'Job Complete', desc: 'Awaiting your approval', status: isJobDone ? 'done' : 'active' }
-              ].map((m, i, arr) => (
-                <div key={i} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '24px', flexShrink: 0 }}>
-                    <div style={{
-                      width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: m.status === 'done' ? '#38a169' : m.status === 'active' ? '#dd6b20' : 'var(--outline-variant)',
-                      border: m.status === 'active' ? '2px solid rgba(221,107,32,0.3)' : 'none'
-                    }}>
-                      {m.status === 'done' && <span className="material-icons" style={{ color: 'white', fontSize: '0.9rem' }}>check</span>}
-                      {m.status === 'active' && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'white' }} />}
-                    </div>
-                    {i < arr.length - 1 && (
-                      <div style={{ width: '2px', height: '40px', background: m.status === 'done' ? '#38a169' : 'var(--outline-variant)', margin: '4px 0' }} />
-                    )}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '0.65rem', background: 'var(--primary-container)', color: 'var(--primary)', padding: '0.2rem 0.6rem', borderRadius: '40px', fontWeight: 800, textTransform: 'uppercase' }}>
+                      {job.category}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--outline)' }}>
+                      Posted {new Date(job.created_at).toLocaleDateString()}
+                    </span>
                   </div>
-                  <div style={{ paddingBottom: i < arr.length - 1 ? '1.5rem' : 0 }}>
-                    <div style={{ fontSize: '0.95rem', fontWeight: m.status === 'active' ? 700 : 600, color: m.status === 'upcoming' ? 'var(--outline)' : 'var(--on-surface)' }}>{m.label}</div>
-                    {m.desc && <div style={{ fontSize: '0.75rem', color: m.status === 'active' || (isJobDone && i === 4) ? '#38a169' : 'var(--on-surface-variant)', marginTop: '0.2rem' }}>{m.desc}</div>}
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--on-surface)' }}>{job.title}</h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>{job.location}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)' }}>₹{job.budget}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#dd6b20', fontSize: '0.8rem', fontWeight: 600, marginTop: '0.2rem' }}>
+                    <span className="material-icons" style={{ fontSize: '1rem' }}>gavel</span>
+                    View Bids
                   </div>
                 </div>
-              ))}
-            </div>
-            
-            {isJobDone && (
-              <div style={{ marginTop: '2.5rem', padding: '1.5rem', background: 'rgba(56,161,105,0.08)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(56,161,105,0.2)' }}>
-                <p style={{ fontSize: '0.9rem', color: '#2f855a', fontWeight: 600, marginBottom: '1.5rem' }}>
-                  Marcus Richardson has marked the job as complete. Please inspect the work and release the payment if you're satisfied.
-                </p>
-                <button className="btn btn--primary" style={{ width: '100%', padding: '1rem', background: '#38a169' }} onClick={() => setView('feedback')}>
-                  Release Payment & Rate Work
-                </button>
               </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%)', borderRadius: 'var(--radius-xl)', padding: '1.5rem', color: 'white', textAlign: 'center' }}>
-              <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '1.8rem', border: '2px solid rgba(255,255,255,0.3)', margin: '0 auto 1rem' }}>MR</div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.2rem' }}>Marcus Richardson</h3>
-              <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)', marginBottom: '1rem' }}>Master HVAC Specialist</div>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
-                <button className="btn btn--outline" style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', padding: '0.5rem', borderRadius: '50%' }}><span className="material-icons" style={{ fontSize: '1.1rem' }}>call</span></button>
-                <button className="btn btn--outline" style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', padding: '0.5rem', borderRadius: '50%' }}><span className="material-icons" style={{ fontSize: '1.1rem' }}>chat</span></button>
-              </div>
-            </div>
-
-            <div style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '1.5rem', border: '1px solid var(--outline-variant)' }}>
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.8rem' }}>Job Management</h4>
-              <button className="btn btn--outline" style={{ width: '100%', marginBottom: '0.6rem', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                Report an Issue <span className="material-icons" style={{ fontSize: '1rem', color: 'var(--outline)' }}>chevron_right</span>
-              </button>
-              <button className="btn btn--outline" style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#e53e3e', borderColor: 'rgba(229,62,62,0.3)' }}>
-                Raise Dispute <span className="material-icons" style={{ fontSize: '1rem', color: '#e53e3e' }}>chevron_right</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  /* ── VIEW 6: FEEDBACK & RATING ── */
-  if (view === 'feedback') {
-    const handleTagClick = (tag) => {
-      setFeedbackText(prev => prev ? `${prev} • ${tag}` : tag)
-    }
-
-    return (
-      <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
-        <div style={{ background: 'var(--surface-container-low)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: '#38a169' }}>
-          <span className="material-icons" style={{ fontSize: '3rem' }}>verified_user</span>
-        </div>
-        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>Payment Released!</h1>
-        <p style={{ fontSize: '0.95rem', color: 'var(--on-surface-variant)', marginBottom: '2.5rem' }}>
-          Thank you for choosing Local Services. Marcus Richardson has been paid ₹850. How was your experience?
-        </p>
-
-        <div style={{ background: '#fff', borderRadius: 'var(--radius-2xl)', padding: '2.5rem', border: '1px solid var(--outline-variant)', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', marginBottom: '2rem' }}>
-          <div style={{ marginBottom: '2rem' }}>
-            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '1.8rem', margin: '0 auto 1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>MR</div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Marcus Richardson</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>Master HVAC Specialist</p>
-          </div>
-
-          <div style={{ marginBottom: '2.5rem' }}>
-            <p style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--on-surface)' }}>Rate the Service</p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
-              {[1, 2, 3, 4, 5].map(star => (
-                <span 
-                  key={star} 
-                  className="material-icons" 
-                  style={{ fontSize: '2.5rem', color: star <= rating ? '#f6ad55' : 'var(--outline-variant)', cursor: 'pointer' }}
-                  onClick={() => setRating(star)}
-                >
-                  {star <= rating ? 'star' : 'star_outline'}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '2rem', textAlign: 'left' }}>
-            <label style={{ fontSize: '0.9rem', fontWeight: 700, display: 'block', marginBottom: '0.8rem', color: 'var(--on-surface)' }}>Your Feedback</label>
-            <textarea 
-              placeholder="What did you like about the work? (Optional)"
-              value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
-              style={{ width: '100%', height: '120px', borderRadius: 'var(--radius-lg)', padding: '1rem', border: '1px solid var(--outline-variant)', background: 'var(--surface-container-lowest)', fontSize: '0.9rem', outline: 'none', resize: 'none' }}
-              onFocus={e => e.target.style.borderColor = 'var(--primary)'}
-              onBlur={e => e.target.style.borderColor = 'var(--outline-variant)'}
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '2.5rem', justifyContent: 'center' }}>
-            {['Punctual', 'Professional', 'Expert', 'Clean Work', 'Good Value'].map(tag => (
-              <span 
-                key={tag} 
-                onClick={() => handleTagClick(tag)}
-                style={{ fontSize: '0.75rem', padding: '0.5rem 1rem', borderRadius: '100px', border: feedbackText.includes(tag) ? '1px solid var(--primary)' : '1px solid var(--outline-variant)', background: feedbackText.includes(tag) ? 'rgba(49,130,206,0.1)' : 'white', color: feedbackText.includes(tag) ? 'var(--primary)' : 'var(--on-surface)', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-              >
-                {tag}
-              </span>
             ))}
           </div>
+        )}
+      </div>
+    )
+  }
 
-          <button className="btn btn--primary" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', borderRadius: 'var(--radius-lg)' }} onClick={() => setView('success')}>
-            Submit Feedback
-          </button>
+  /* ── VIEW 1: BIDS RECEIVED ── */
+  if (view === 'bid_list') {
+    return (
+      <div style={{ maxWidth: '800px', margin: '0 auto', animation: 'fadeIn 0.3s' }}>
+        <button className="btn btn--ghost" onClick={() => setView('job_list')} style={{ marginBottom: '1.5rem', padding: '0.5rem' }}>
+          <span className="material-icons" style={{ fontSize: '1rem', marginRight: '6px', verticalAlign: 'middle' }}>arrow_back</span> Back to Requests
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+          <h1 style={{ fontSize: '1.8rem', fontWeight: 800 }}>🔥 {bids.length} Bid{bids.length !== 1 ? 's' : ''} Received</h1>
+        </div>
+        <div style={{ background: 'var(--surface-container-low)', padding: '1rem 1.5rem', borderRadius: 'var(--radius-lg)', marginBottom: '2rem', border: '1px solid var(--outline-variant)' }}>
+            <h4 style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--outline)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>For Request</h4>
+            <div style={{ fontSize: '1rem', fontWeight: 700 }}>{selectedJob.title}</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>{selectedJob.description}</div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {bids.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', background: '#fff', borderRadius: 'var(--radius-xl)', border: '1px dashed var(--outline)' }}>
+              <p style={{ color: 'var(--on-surface-variant)' }}>No bids received yet. Professionals have been notified and will respond shortly.</p>
+            </div>
+          ) : (
+            bids.map(bid => (
+              <div key={bid.id} style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '1.5rem', border: '1px solid var(--outline-variant)', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+                  <div style={{ 
+                    width: '56px', height: '56px', borderRadius: '50%', 
+                    background: 'rgba(49,130,206,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                    color: '#3182ce', fontWeight: 700, fontSize: '1.2rem' 
+                  }}>
+                    {bid.provider?.name?.charAt(0) || 'P'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{bid.provider?.name || 'Service Provider'}</h3>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)' }}>₹{bid.amount}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                      <span style={{ fontSize: '0.75rem', background: 'rgba(56,161,105,0.1)', color: '#38a169', padding: '0.2rem 0.6rem', borderRadius: '100px', fontWeight: 700 }}>
+                        Trust: {bid.provider?.trust_score || 'N/A'}/10
+                      </span>
+                      <span style={{ fontSize: '0.75rem', background: 'var(--surface-container)', color: 'var(--on-surface-variant)', padding: '0.2rem 0.6rem', borderRadius: '100px', fontWeight: 600 }}>
+                        {bid.provider?.role || 'Expert'}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)', marginBottom: '1.5rem', lineHeight: 1.5, fontStyle: 'italic' }}>
+                      "{bid.message || 'I would like to help you with this project.'}"
+                    </p>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      <button className="btn btn--outline" style={{ flex: 1, padding: '0.6rem' }}>View Profile</button>
+                      <button className="btn btn--primary" style={{ flex: 2, padding: '0.6rem' }} onClick={() => setView('payment')}>Accept Proposal</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     )
   }
 
-  /* ── VIEW 7: SUCCESS / RETURN TO HOME ── */
+  if (view === 'payment') {
+      return (
+        <div style={{ maxWidth: '500px', margin: '0 auto', textAlign: 'center', padding: '4rem 2rem' }}>
+          <span className="material-icons" style={{ fontSize: '4rem', color: 'var(--primary)', marginBottom: '1rem' }}>payments</span>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Secure Payment</h2>
+          <p style={{ color: 'var(--on-surface-variant)', marginBottom: '2rem' }}>Proceeding to secure payment for the selected bid. Funds will be held in escrow.</p>
+          <button className="btn btn--primary" style={{ width: '100%', padding: '1rem' }} onClick={() => setView('success')}>Confirm Payment</button>
+          <button className="btn btn--ghost" style={{ display: 'block', margin: '1rem auto' }} onClick={() => setView('bid_list')}>Cancel</button>
+        </div>
+      )
+  }
+
   if (view === 'success') {
     return (
       <div style={{ maxWidth: '500px', margin: '0 auto', textAlign: 'center', padding: '4rem 2rem' }}>
         <div style={{ background: '#38a169', width: '100px', height: '100px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem', color: 'white', boxShadow: '0 20px 40px rgba(56,161,105,0.3)' }}>
           <span className="material-icons" style={{ fontSize: '4rem' }}>check_circle</span>
         </div>
-        <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '1rem' }}>Great Success!</h1>
+        <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '1rem' }}>Booking Confirmed!</h1>
         <p style={{ fontSize: '1rem', color: 'var(--on-surface-variant)', lineHeight: 1.6, marginBottom: '2.5rem' }}>
-          Your feedback helps us maintain a high standard of service and supports professional experts like Marcus. We hope to see you again soon!
+          Your payment is held in escrow. The professional will reach out to you shortly to start the work.
         </p>
-        <button className="btn btn--primary" style={{ width: '100%', padding: '1.2rem', fontSize: '1.1rem', borderRadius: 'var(--radius-xl)' }} onClick={() => navigate('/dashboard')}>
-          Return to Client Dashboard
+        <button className="btn btn--primary" style={{ width: '100%', padding: '1.2rem', fontSize: '1.1rem', borderRadius: 'var(--radius-xl)' }} onClick={() => setView('job_list')}>
+          Manage Bookings
         </button>
       </div>
     )
