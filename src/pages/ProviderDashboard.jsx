@@ -73,11 +73,80 @@ const MOCK_SCHEDULE = [
 
 const SIDEBAR_LINKS = [
   { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
-  { id: 'jobs', icon: 'work', label: 'Jobs' },
+  { id: 'jobs', icon: 'work', label: 'Explore Jobs' },
+  { id: 'my_bids', icon: 'gavel', label: 'My Bids' },
   { id: 'earnings', icon: 'payments', label: 'Earnings' },
   { id: 'customers', icon: 'groups', label: 'Customers' },
   { id: 'profile', icon: 'person', label: 'Profile' }
 ]
+
+function ProviderBidsView({ providerId }) {
+  const [bids, setBids] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!providerId) return
+    async function fetchBids() {
+      const { data, error } = await supabase
+        .from('bids')
+        .select('*, jobs(*)')
+        .eq('provider_id', providerId)
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        console.error('Error fetching provider bids:', error)
+      } else {
+        setBids(data || [])
+      }
+      setLoading(false)
+    }
+    fetchBids()
+  }, [providerId])
+
+  if (loading) return <div style={{ textAlign: 'center', padding: '3rem' }}>⏳ Loading your bids...</div>
+
+  return (
+    <div style={{ animation: 'fadeIn 0.3s' }}>
+      <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '1.5rem' }}>My Submitted Bids</h2>
+      {bids.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem', background: '#fff', borderRadius: 'var(--radius-xl)', border: '1px solid var(--outline-variant)' }}>
+            <span className="material-icons" style={{ fontSize: '3rem', color: 'var(--outline-variant)', marginBottom: '1rem' }}>gavel</span>
+            <p>You haven't placed any bids yet.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {bids.map(bid => (
+            <div key={bid.id} style={{ background: '#fff', borderRadius: 'var(--radius-lg)', padding: '1.5rem', border: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: '0.65rem', background: bid.status === 'accepted' ? 'rgba(56,161,105,0.1)' : 'var(--surface-container)', color: bid.status === 'accepted' ? '#38a169' : 'var(--on-surface-variant)', padding: '0.2rem 0.6rem', borderRadius: '40px', fontWeight: 800, textTransform: 'uppercase' }}>
+                    {bid.status}
+                  </span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--outline)' }}>
+                     Bid on: {new Date(bid.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                  </span>
+                </div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{bid.jobs?.title || 'Unknown Job'}</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)', marginBottom: '0.4rem' }}>{bid.jobs?.location}</p>
+                <div style={{ fontSize: '0.75rem', color: 'var(--outline)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <span>📅 Client Booked: {new Date(bid.jobs?.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                  {bid.status === 'accepted' && bid.jobs?.accepted_at && (
+                    <span style={{ color: '#38a169', fontWeight: 600 }}>✅ Accepted At: {new Date(bid.jobs.accepted_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                  )}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)' }}>₹{bid.amount}</div>
+                {bid.status === 'accepted' && <button className="btn btn--primary" style={{ marginTop: '0.5rem', padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>Open Workspace</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 export default function ProviderDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -437,6 +506,113 @@ export default function ProviderDashboard() {
                 )}
               </div>
 
+              {/* Location & Radius Filter Bar */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(26,54,93,0.04) 0%, rgba(49,130,206,0.06) 100%)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '1rem 1.2rem',
+                marginBottom: '1.2rem',
+                border: '1px solid var(--outline-variant)',
+              }}>
+                {/* Location Status */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{
+                      width: '28px', height: '28px', borderRadius: '50%',
+                      background: providerLocation ? 'rgba(56,161,105,0.12)' : isLocating ? 'rgba(49,130,206,0.12)' : 'rgba(229,62,62,0.12)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span className="material-icons" style={{
+                        fontSize: '0.95rem',
+                        color: providerLocation ? '#38a169' : isLocating ? '#3182ce' : '#e53e3e',
+                        animation: isLocating ? 'pulse 1.5s infinite' : 'none'
+                      }}>
+                        {providerLocation ? 'my_location' : isLocating ? 'sync' : 'location_off'}
+                      </span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: providerLocation ? '#38a169' : '#e53e3e' }}>
+                        {providerLocation ? 'Location Active' : isLocating ? 'Detecting...' : 'Location Off'}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--on-surface-variant)' }}>
+                        {providerLocation 
+                          ? `${providerLocation.lat.toFixed(4)}°, ${providerLocation.lng.toFixed(4)}°` 
+                          : locationError || 'Enable location for radius filter'}
+                      </div>
+                    </div>
+                  </div>
+                  {!providerLocation && !isLocating && (
+                    <button
+                      onClick={() => {
+                        setIsLocating(true)
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
+                            setProviderLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+                            setIsLocating(false)
+                            setLocationError(null)
+                          },
+                          (err) => {
+                            setLocationError('Permission denied')
+                            setIsLocating(false)
+                          }
+                        )
+                      }}
+                      style={{
+                        background: 'var(--primary)', color: 'white', border: 'none',
+                        borderRadius: 'var(--radius-sm)', padding: '0.3rem 0.7rem',
+                        fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '4px'
+                      }}
+                    >
+                      <span className="material-icons" style={{ fontSize: '0.85rem' }}>gps_fixed</span>
+                      Enable
+                    </button>
+                  )}
+                </div>
+
+                {/* Radius Slider */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Search Radius
+                    </label>
+                    <span style={{
+                      fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)',
+                      background: 'var(--primary-container)', padding: '2px 10px',
+                      borderRadius: '100px',
+                    }}>
+                      {searchRadius} km
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    value={searchRadius}
+                    onChange={e => setSearchRadius(parseInt(e.target.value))}
+                    style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--primary)', height: '6px' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--outline)', marginTop: '2px' }}>
+                    <span>1 km</span>
+                    <span>25 km</span>
+                    <span>50 km</span>
+                  </div>
+                </div>
+
+                {/* Filter summary */}
+                {providerLocation && (
+                  <div style={{
+                    marginTop: '0.6rem', paddingTop: '0.6rem',
+                    borderTop: '1px solid var(--outline-variant)',
+                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    fontSize: '0.72rem', color: 'var(--on-surface-variant)',
+                  }}>
+                    <span className="material-icons" style={{ fontSize: '0.85rem', color: '#3182ce' }}>filter_alt</span>
+                    Showing <strong style={{ color: 'var(--primary)' }}>{filteredRequests.length}</strong> request{filteredRequests.length !== 1 ? 's' : ''} within {searchRadius} km
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {visibleRequests.map(req => (
                   <div key={req.id} 
@@ -471,7 +647,7 @@ export default function ProviderDashboard() {
                             color: '#3182ce',
                           }}>Pending</span>
                         </div>
-                        <p style={{ fontSize: '0.78rem', color: 'var(--on-surface-variant)', marginBottom: '0.6rem' }}>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--on-surface-variant)', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
                           <span className="material-icons" style={{ fontSize: '0.8rem', verticalAlign: 'middle', marginRight: '2px' }}>location_on</span>
                           {req.address} &nbsp;·&nbsp; 
                           <span style={{ 

@@ -24,15 +24,17 @@ async function sendBidAcceptedEmail(provider, jobTitle) {
 
 export default function CustomerJobsFlow() {
   const navigate = useNavigate()
-  const [view, setView] = useState('bids')
+  const [view, setView] = useState('job_list')
   const [selectedBid, setSelectedBid] = useState(null)
   const [feedbackText, setFeedbackText] = useState('')
   const [rating, setRating] = useState(4)
   const [emailSent, setEmailSent] = useState(false)
-  const [job, setJob] = useState(null)
+  const [jobs, setJobs] = useState([])
   const [bids, setBids] = useState([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
+  const [selectedJob, setSelectedJob] = useState(null)
+  const [bidCounts, setBidCounts] = useState({})
 
   useEffect(() => {
     let subscription;
@@ -67,25 +69,22 @@ export default function CustomerJobsFlow() {
   async function fetchJobAndBids(userId) {
     setLoading(true)
     try {
-      // 1. Get latest job for this consumer
-      const { data: jobData, error: jobError } = await supabase
+      // 1. Get all jobs for this consumer
+      const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select('*')
         .eq('consumer_id', userId)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
 
-      if (jobError) throw jobError
-      setJob(jobData)
+      if (jobsError) throw jobsError
+      setJobs(jobsData || [])
 
-      if (jobData) {
-        // 2. Get bids for this job
-        const { data: bidsData, error: bidsError } = await supabase
+      if (jobsData && jobsData.length > 0) {
+        // 2. Get bid counts for all jobs
+        const { data: countsData, error: countsError } = await supabase
           .from('bids')
-          .select('*, service_providers(*)')
-          .eq('job_id', jobData.id)
-          .eq('status', 'pending')
+          .select('job_id')
+          .in('job_id', jobsData.map(j => j.id))
 
         if (bidsError) throw bidsError
         setBids(bidsData || [])
@@ -120,8 +119,70 @@ export default function CustomerJobsFlow() {
     }
   }
 
+  // Real-time subscription
+  useEffect(() => {
+    if (!user) return
+
+    const jobsChannel = supabase
+      .channel('jobs-realtime')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'jobs', 
+        filter: `consumer_id=eq.${user.id}` 
+      }, (payload) => {
+        setJobs(prev => [payload.new, ...prev])
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'jobs',
+        filter: `consumer_id=eq.${user.id}`
+      }, (payload) => {
+        setJobs(prev => prev.map(j => j.id === payload.new.id ? payload.new : j))
+      })
+      .subscribe()
+
+    const bidsChannel = supabase
+      .channel('bids-realtime')
+      .on('postgres_changes', {
+        event: '*', // Listen to all bid changes
+        schema: 'public',
+        table: 'bids',
+      }, (payload) => {
+        const jobId = payload.new?.job_id || payload.old?.job_id
+        if (!jobId) return
+
+        // Update bid counts
+        setBidCounts(prev => {
+          const newCounts = { ...prev }
+          if (payload.eventType === 'INSERT') {
+            newCounts[jobId] = (newCounts[jobId] || 0) + 1
+          } else if (payload.eventType === 'DELETE') {
+            newCounts[jobId] = Math.max(0, (newCounts[jobId] || 1) - 1)
+          }
+          return newCounts
+        })
+        
+        // Refresh detailed bids if it's the active job
+        const activeJob = selectedJob || (jobs.length > 0 ? jobs[0] : null)
+        if (activeJob && jobId === activeJob.id) {
+          fetchBids(activeJob.id)
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(jobsChannel)
+      supabase.removeChannel(bidsChannel)
+    }
+  }, [user, selectedJob, jobs, view])
+
   const handleAcceptBid = async (bid) => {
     try {
+      const activeJob = jobs.find(j => j.id === bid.job_id) || selectedJob || jobs[0]
+      if (!activeJob) throw new Error('Job not found')
+
       // 1. Update bid status
       const { error: bidUpdateError } = await supabase
         .from('bids')
@@ -171,13 +232,13 @@ export default function CustomerJobsFlow() {
     }
   }
 
-  /* ── VIEW 1: BIDS RECEIVED ── */
   if (view === 'bids') {
+    const activeJob = selectedJob || jobs[0]
     return (
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '1.8rem', fontWeight: 800 }}>
-            {loading ? '⏳ Loading Bids...' : job ? `🔥 ${bids.length} Bid${bids.length !== 1 ? 's' : ''} for "${job.title}"` : 'No Active Job Requests'}
+            {loading ? '⏳ Loading Bids...' : activeJob ? `🔥 ${bidCounts[activeJob.id] || 0} Bid${(bidCounts[activeJob.id] || 0) !== 1 ? 's' : ''} for "${activeJob.title}"` : 'No Active Job Requests'}
           </h1>
         </div>
         <p style={{ fontSize: '0.9rem', color: 'var(--on-surface-variant)', marginBottom: '2rem' }}>
@@ -191,7 +252,7 @@ export default function CustomerJobsFlow() {
           </div>
         )}
 
-        {!loading && !job && (
+        {!loading && jobs.length === 0 && (
           <div style={{ textAlign: 'center', padding: '3rem', background: '#fff', borderRadius: 'var(--radius-xl)', border: '1px solid var(--outline-variant)' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📝</div>
             <h3 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>No Active Requests</h3>
@@ -199,7 +260,7 @@ export default function CustomerJobsFlow() {
           </div>
         )}
 
-        {!loading && job && bids.length === 0 && (
+        {!loading && jobs.length > 0 && bids.length === 0 && (
           <div style={{ textAlign: 'center', padding: '3rem', background: '#fff', borderRadius: 'var(--radius-xl)', border: '1px solid var(--outline-variant)' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⌛</div>
             <h3 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>Waiting for Bids</h3>
@@ -290,60 +351,14 @@ export default function CustomerJobsFlow() {
 
   if (loading) {
     return (
-      <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>Payment Summary</h1>
-        <p style={{ fontSize: '0.9rem', color: 'var(--on-surface-variant)', marginBottom: '2rem' }}>
-          You're one step away from securing your professional expert. Review your transaction details before proceeding to our encrypted gateway.
-        </p>
-
-        <div style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '2rem', border: '1px solid var(--outline-variant)', boxShadow: 'var(--shadow-sm)', marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(49,130,206,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3182ce', fontWeight: 700, fontSize: '1.4rem', marginBottom: '1rem' }}>
-              {selectedBid.service_providers?.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '??'}
-            </div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.2rem' }}>{selectedBid.service_providers?.name}</h3>
-            <div style={{ fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>{selectedBid.service_providers?.categories?.[0] || 'Professional'}</div>
-          </div>
-
-          <div style={{ borderTop: '2px dashed var(--outline-variant)', borderBottom: '2px dashed var(--outline-variant)', padding: '1.5rem 0', marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem', fontSize: '0.9rem' }}>
-              <span style={{ color: 'var(--on-surface-variant)' }}>Service Fee</span>
-              <strong>₹{selectedBid.amount}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-              <span style={{ color: 'var(--on-surface-variant)' }}>Platform Fee</span>
-              <strong>₹50</strong>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)' }}>Total Secure Payment</span>
-            <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)' }}>₹{parseInt(selectedBid.amount) + 50}</span>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center', color: '#38a169', marginBottom: '2rem' }}>
-          <span className="material-icons" style={{ fontSize: '1.1rem' }}>lock</span>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>256-bit Encrypted Checkout</span>
-        </div>
-
-        <button
-          className="btn btn--primary"
-          style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
-          onClick={async () => {
-            if (selectedBid && !emailSent) {
-              setEmailSent(true)
-              await sendBidAcceptedEmail(selectedBid)
-            }
-            setView('tracking')
-          }}
-        >
-          Confirm Secure Payment
-        </button>
-        <button className="btn btn--ghost" style={{ marginTop: '1rem', width: '100%' }} onClick={() => setView('bid_details')}>Cancel</button>
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
+        <div className="loader">Loading...</div>
       </div>
     )
   }
+
+
+
 
   /* ── VIEW 0: JOB LIST ── */
   if (view === 'job_list') {
@@ -378,17 +393,24 @@ export default function CustomerJobsFlow() {
                       {job.category}
                     </span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--outline)' }}>
-                      Posted {new Date(job.created_at).toLocaleDateString()}
+                      Booked: {new Date(job.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                     </span>
                   </div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--on-surface)' }}>{job.title}</h3>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>{job.location}</p>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)', marginBottom: '0.4rem' }}>{job.location}</p>
+                  
+                  {job.status === 'accepted' && job.accepted_at && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#38a169', fontSize: '0.75rem', fontWeight: 700 }}>
+                      <span className="material-icons" style={{ fontSize: '0.9rem' }}>check_circle</span>
+                      Accepted: {new Date(job.accepted_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                    </div>
+                  )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)' }}>₹{job.budget}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#dd6b20', fontSize: '0.8rem', fontWeight: 600, marginTop: '0.2rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#dd6b20', fontSize: '0.8rem', fontWeight: 600, marginTop: '0.4rem' }}>
                     <span className="material-icons" style={{ fontSize: '1rem' }}>gavel</span>
-                    View Bids
+                    {job.status === 'accepted' ? 'View Details' : 'View Bids'}
                   </div>
                 </div>
               </div>
@@ -412,8 +434,16 @@ export default function CustomerJobsFlow() {
         </div>
         <div style={{ background: 'var(--surface-container-low)', padding: '1rem 1.5rem', borderRadius: 'var(--radius-lg)', marginBottom: '2rem', border: '1px solid var(--outline-variant)' }}>
             <h4 style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--outline)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>For Request</h4>
-            <div style={{ fontSize: '1rem', fontWeight: 700 }}>{selectedJob.title}</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>{selectedJob.description}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: '1rem', fontWeight: 700 }}>{selectedJob.title}</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)' }}>{selectedJob.description}</div>
+              </div>
+              <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--outline)' }}>
+                <div>Booked: {new Date(selectedJob.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</div>
+                {selectedJob.accepted_at && <div style={{ color: '#38a169', fontWeight: 600 }}>Accepted: {new Date(selectedJob.accepted_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</div>}
+              </div>
+            </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

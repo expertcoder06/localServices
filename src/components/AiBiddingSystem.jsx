@@ -260,7 +260,7 @@ export default function AiBiddingSystem() {
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.2rem' }}>{selectedJob.title}</h3>
               <p style={{ fontSize: '0.78rem', color: 'var(--on-surface-variant)' }}>
                 <span className="material-icons" style={{ fontSize: '0.82rem', verticalAlign: 'middle', marginRight: '2px' }}>location_on</span>
-                {selectedJob.location} · {selectedJob.distance} · {selectedJob.postedAt}
+                {selectedJob.location} · {selectedJob.distance} · Booked at {selectedJob.postedAt}
               </p>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>

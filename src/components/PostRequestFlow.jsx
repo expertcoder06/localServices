@@ -421,14 +421,14 @@ export default function PostRequestFlow({ onClose }) {
           {/* Audio */}
           <div style={{ flex: 1, position: 'relative' }}>
             <div
-              style={{ height: '100%', border: '2px dashed var(--outline-variant)', borderRadius: 'var(--radius-md)', padding: '1.5rem', textAlign: 'center', cursor: form.audio ? 'default' : 'pointer', background: isRecording ? 'rgba(229,62,62,0.05)' : form.audio ? 'rgba(56,161,105,0.05)' : '#fafafa' }}
-              onClick={form.audio ? null : isRecording ? stopRecording : startRecording}
+              style={{ height: '100%', border: '2px dashed var(--outline-variant)', borderRadius: 'var(--radius-md)', padding: '1.5rem', textAlign: 'center', cursor: 'pointer', background: isRecording ? 'rgba(229,62,62,0.05)' : form.audio ? 'rgba(56,161,105,0.05)' : '#fafafa' }}
+              onClick={isRecording ? stopRecording : form.audio ? toggleAudio : startRecording}
             >
-              <span className="material-icons" style={{ color: isRecording ? '#e53e3e' : form.audio ? '#38a169' : 'var(--outline)', fontSize: '1.8rem', marginBottom: '0.3rem', display: 'block', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
-                {isRecording ? 'stop_circle' : form.audio ? 'library_music' : 'mic'}
+              <span className="material-icons" style={{ color: isRecording ? '#e53e3e' : form.audio ? 'var(--primary)' : 'var(--outline)', fontSize: '1.8rem', marginBottom: '0.3rem', display: 'block', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
+                {isRecording ? 'stop_circle' : isPlaying ? 'pause_circle' : form.audio ? 'play_circle' : 'mic'}
               </span>
-              <span style={{ fontSize: '0.78rem', color: 'var(--on-surface-variant)', lineHeight: 1.3, display: 'block' }}>
-                {isRecording ? 'Recording... Tap to stop' : form.audio ? 'Voice message ready' : 'Tap to record audio'}
+              <span style={{ fontSize: '0.78rem', color: isPlaying ? 'var(--primary)' : 'var(--on-surface-variant)', lineHeight: 1.3, display: 'block', fontWeight: isPlaying ? 700 : 400 }}>
+                {isRecording ? 'Recording...' : isPlaying ? 'Playing Audio' : form.audio ? 'Tap to Preview' : 'Tap to record'}
               </span>
             </div>
             {form.audio && <span className="material-icons" style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '1.2rem', color: '#e53e3e', cursor: 'pointer', zIndex: 10 }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); update('audio', false); if(audioRef.current) { audioRef.current.pause(); audioRef.current = null; setIsPlayingAudio(false); } }}>cancel</span>}
