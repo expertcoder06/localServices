@@ -412,15 +412,6 @@ export default function AdminDashboard() {
   return (
     <div className="bg-surface font-body text-on-surface selection:bg-primary-fixed selection:text-on-primary-fixed w-full min-h-screen">
       <aside className="fixed left-0 top-0 h-screen w-64 border-r-0 bg-slate-50 dark:bg-slate-950 flex flex-col h-full p-6 gap-4 shadow-[12px_0_32px_0_rgba(0,0,0,0.02)] z-50">
-        <div className="mb-8 px-2 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-lg">
-            <span className="material-symbols-outlined" data-icon="settings_suggest">settings_suggest</span>
-          </div>
-          <div>
-            <h2 className="font-headline text-sm font-bold tracking-tight text-primary">Admin Panel</h2>
-            <p className="text-[10px] text-secondary font-label uppercase tracking-widest">Management Suite</p>
-          </div>
-        </div>
         <nav className="flex-1 space-y-2">
           <a onClick={() => setActiveTab('overview')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-inter text-sm font-semibold uppercase tracking-widest transition-all duration-200 cursor-pointer ${activeTab === 'overview' ? 'text-orange-600 dark:text-orange-500 bg-orange-50/50 dark:bg-orange-900/20 shadow-[0_4px_15px_rgba(221,107,32,0.15)] translate-x-1' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800'}`}>
             <span className="text-xl">📊</span>

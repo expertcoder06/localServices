@@ -31,7 +31,6 @@ export default function Navbar() {
         {/* CTA */}
         <div className="navbar__actions">
           <Link to="/login" className="btn btn--ghost">Sign In</Link>
-          <Link to="/signup" className="btn btn--primary">Get Started</Link>
         </div>
 
         {/* Hamburger */}
@@ -49,7 +48,7 @@ export default function Navbar() {
           <a href="#how-it-works" onClick={() => setMenuOpen(false)}>How it Works</a>
           <a href="#pricing" onClick={() => setMenuOpen(false)}>Pricing</a>
           <a href="#professionals" onClick={() => setMenuOpen(false)}>For Professionals</a>
-          <Link to="/signup" className="btn btn--primary" style={{marginTop: '1rem'}}>Get Started</Link>
+
         </div>
       )}
     </nav>
