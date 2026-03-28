@@ -1,15 +1,6 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export default function HeroSection() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [location, setLocation] = useState('Your Location');
-  const navigate = useNavigate();
-
-  const handleSearch = () => {
-    navigate('/dashboard', { state: { searchQuery, location } });
-  };
-
   return (
     <section className="hero" id="hero">
       {/* Background blobs */}
@@ -33,30 +24,10 @@ export default function HeroSection() {
           The digital architect of your home services.
         </p>
 
-        {/* Search bar */}
-        <div className="hero__search">
-          <div className="hero__search-inner">
-            <span className="material-icons hero__search-icon">search</span>
-            <input
-              type="text"
-              className="hero__search-input"
-              placeholder="What service do you need?"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            />
-            <select 
-              className="hero__search-select"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-            >
-              <option>Your Location</option>
-              <option>Mumbai</option>
-              <option>Delhi</option>
-              <option>Bangalore</option>
-            </select>
-            <button className="btn btn--primary hero__search-btn" onClick={handleSearch}>Find Pros</button>
-          </div>
+        {/* CTA Buttons */}
+        <div className="hero__cta-buttons">
+          <a href="#how-it-works" className="btn btn--ghost btn--lg">See Demo</a>
+          <Link to="/signup" className="btn btn--primary btn--lg">Get Started</Link>
         </div>
 
         {/* Quick tags */}
