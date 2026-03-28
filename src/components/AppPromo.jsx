@@ -60,7 +60,14 @@ export default function AppPromo() {
             </ul>
 
             <div className="app-promo__btns">
-              <a href="#" className="btn btn--primary">Download App</a>
+              <a 
+                href="https://www.webtonative.com/checkout/69c5f5525711ecee5e3ea604?previewId=3UH9U" 
+                className="btn btn--primary"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Download App
+              </a>
               <a href="#" className="btn btn--ghost">Learn More</a>
             </div>
           </div>
