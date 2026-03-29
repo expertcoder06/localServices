@@ -8,6 +8,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [allUsers, setAllUsers] = useState([]);
   const [searchUserId, setSearchUserId] = useState('');
+  const [complaints, setComplaints] = useState([]);
   
   useEffect(() => {
     const fetchAdmin = async () => {
@@ -33,9 +34,18 @@ export default function AdminDashboard() {
       setAllUsers(combined);
     };
 
+    const fetchComplaints = async () => {
+      const { data, error } = await supabase
+        .from('complaints')
+        .select('*, jobs(title), consumers:user_id(name)')
+        .order('created_at', { ascending: false });
+      if (data) setComplaints(data);
+    };
+
     fetchAdmin();
     fetchPendingProviders();
     fetchAllUsers();
+    fetchComplaints();
   }, [activeTab]); // Refetch when tabs change to keep data fresh
 
   const handleApprove = async (id) => {
@@ -278,33 +288,51 @@ export default function AdminDashboard() {
                   <thead>
                     <tr className="border-b border-slate-200">
                       <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider">Report ID</th>
-                      <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider">Reported User</th>
-                      <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider">Reported By</th>
-                      <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider">Reason</th>
+                      <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider">Job / User</th>
+                      <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider">Type</th>
+                      <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider">Description</th>
                       <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                      <td className="py-4 px-4 text-xs font-mono text-slate-500">#RPT-882</td>
-                      <td className="py-4 px-4">
-                        <p className="text-sm font-semibold text-primary">Mike Plumber</p>
-                        <p className="text-xs text-slate-400">Provider • ID: d8f1...</p>
-                      </td>
-                      <td className="py-4 px-4 text-sm text-secondary">Sarah Connor (Consumer)</td>
-                      <td className="py-4 px-4"><span className="text-sm bg-orange-50 text-orange-700 px-3 py-1 rounded-full font-medium border border-orange-100">No Show</span></td>
-                      <td className="py-4 px-4"><button className="text-xs font-bold text-red-600 hover:text-red-700 uppercase tracking-wide">Review Case</button></td>
-                    </tr>
-                    <tr className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                      <td className="py-4 px-4 text-xs font-mono text-slate-500">#RPT-883</td>
-                      <td className="py-4 px-4">
-                        <p className="text-sm font-semibold text-primary">FastFix Auto</p>
-                        <p className="text-xs text-slate-400">Provider • ID: 29ea...</p>
-                      </td>
-                      <td className="py-4 px-4 text-sm text-secondary">System Algorithm</td>
-                      <td className="py-4 px-4"><span className="text-sm bg-red-50 text-red-700 px-3 py-1 rounded-full font-medium border border-red-100">Spam Bids Detect</span></td>
-                      <td className="py-4 px-4"><button className="text-xs font-bold text-red-600 hover:text-red-700 uppercase tracking-wide">Review Case</button></td>
-                    </tr>
+                    {complaints.map(rpt => (
+                      <tr key={rpt.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                        <td className="py-4 px-4 text-xs font-mono text-slate-500">#{rpt.id.substring(0,8)}</td>
+                        <td className="py-4 px-4">
+                          <p className="text-sm font-semibold text-primary">{rpt.jobs?.title || 'Unknown Job'}</p>
+                          <p className="text-xs text-slate-400">By: {rpt.consumers?.name || 'User'} ({rpt.user_type})</p>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={`text-xs px-2 py-1 rounded-full font-bold border ${
+                            rpt.issue_type === 'no_show' ? 'bg-red-50 text-red-700 border-red-100' : 
+                            rpt.issue_type === 'delay' ? 'bg-orange-50 text-orange-700 border-orange-100' : 
+                            'bg-blue-50 text-blue-700 border-blue-100'
+                          }`}>
+                            {rpt.issue_type.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-sm text-secondary max-w-xs truncate">{rpt.description}</td>
+                        <td className="py-4 px-4">
+                          <div className="flex gap-2">
+                             <button 
+                              onClick={async () => {
+                                if (window.confirm("Approve this report and mark as resolved?")) {
+                                  await supabase.from('complaints').update({ status: 'resolved' }).eq('id', rpt.id);
+                                  setComplaints(prev => prev.filter(c => c.id !== rpt.id));
+                                }
+                              }}
+                              className="text-xs font-bold text-green-600 hover:text-green-700 uppercase tracking-wide"
+                             >Resolve</button>
+                             {rpt.photo_proof && <button className="text-xs font-bold text-blue-600 hover:text-blue-700 uppercase tracking-wide" onClick={() => window.open(rpt.photo_proof, '_blank')}>View Proof</button>}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {complaints.length === 0 && (
+                      <tr>
+                        <td colSpan="5" className="py-8 text-center text-secondary text-sm italic">No active reports found. Clean slate!</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -413,15 +441,6 @@ export default function AdminDashboard() {
   return (
     <div className="bg-surface font-body text-on-surface selection:bg-primary-fixed selection:text-on-primary-fixed w-full min-h-screen">
       <aside className="fixed left-0 top-0 h-screen w-64 border-r-0 bg-slate-50 dark:bg-slate-950 flex flex-col h-full p-6 gap-4 shadow-[12px_0_32px_0_rgba(0,0,0,0.02)] z-50">
-        <div className="mb-8 px-2 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-lg">
-            <span className="material-symbols-outlined" data-icon="settings_suggest">settings_suggest</span>
-          </div>
-          <div>
-            <h2 className="font-headline text-sm font-bold tracking-tight text-primary">Admin Panel</h2>
-            <p className="text-[10px] text-secondary font-label uppercase tracking-widest">Management Suite</p>
-          </div>
-        </div>
         <nav className="flex-1 space-y-2">
           <a onClick={() => setActiveTab('overview')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-inter text-sm font-semibold uppercase tracking-widest transition-all duration-200 cursor-pointer ${activeTab === 'overview' ? 'text-orange-600 dark:text-orange-500 bg-orange-50/50 dark:bg-orange-900/20 shadow-[0_4px_15px_rgba(221,107,32,0.15)] translate-x-1' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800'}`}>
             <span className="text-xl">📊</span>

@@ -6,6 +6,7 @@ import PostRequestFlow from '../components/PostRequestFlow'
 import CustomerJobsFlow from '../components/CustomerJobsFlow'
 import UserProfile from '../components/UserProfile'
 import ProviderScheduleBar from '../components/ProviderScheduleBar'
+import CurrentWork from '../components/CurrentWork'
 
 // generateMockData removed in favor of real database fetching
 
@@ -25,21 +26,31 @@ export default function CustomerDashboard() {
   const [filterTimeTo, setFilterTimeTo] = useState('')
   const [showAvailFilter, setShowAvailFilter] = useState(false)
 
-  // Sync search query when location state changes (e.g. chatbot navigation)
+  // Sync tab and search query from location state
   useEffect(() => {
+    if (navLocation.state?.activeTab) {
+      setActiveTab(navLocation.state.activeTab)
+    }
     if (navLocation.state?.searchQuery) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchQuery(navLocation.state.searchQuery)
-      setActiveTab('dashboard')
+      if (!navLocation.state.activeTab) setActiveTab('dashboard')
     }
-  }, [navLocation.state?.searchQuery, navLocation.key])
+    if (navLocation.state?.showPostRequest) {
+      setPostRequestInitialData(navLocation.state.initialData || null)
+      setShowPostRequest(true)
+    }
+  }, [navLocation.state, navLocation.key])
 
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [showPostRequest, setShowPostRequest] = useState(false)
+  const [postRequestInitialData, setPostRequestInitialData] = useState(null)
   const [userName, setUserName] = useState('User')
   const [userInitials, setUserInitials] = useState('U')
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [activeJob, setActiveJob] = useState(null)
+  const [lastCompletedJob, setLastCompletedJob] = useState(null)
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -62,10 +73,45 @@ export default function CustomerDashboard() {
       }
     }
     fetchUser()
+    
+    async function fetchJobsData() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Active Job
+      const { data: active } = await supabase
+        .from('jobs')
+        .select('*, service_providers!accepted_provider_id(name, email, wallet_balance)')
+        .eq('consumer_id', user.id)
+        .in('status', ['accepted', 'in_progress', 'completed'])
+        .maybeSingle()
+      if (active) setActiveJob(active)
+
+      // Last Completed Job for Rating
+      const { data: last } = await supabase
+        .from('jobs')
+        .select('*, service_providers!accepted_provider_id(name)')
+        .eq('consumer_id', user.id)
+        .eq('status', 'finished')
+        .order('actual_completion_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (last) setLastCompletedJob(last)
+    }
+    
+    fetchJobsData()
+
+    // Real-time listener for jobs
+    const channel = supabase.channel('dashboard-jobs-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchJobsData)
+      .subscribe()
+      
+    return () => supabase.removeChannel(channel)
   }, [])
 
   const sidebarLinks = [
     { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
+    { id: 'currentWork', icon: 'engineering', label: 'Current Work' },
     { id: 'bookings', icon: 'event', label: 'My Bookings' },
     { id: 'schedule', icon: 'calendar_month', label: 'Schedule' },
     { id: 'profile', icon: 'person', label: 'Profile' },
@@ -309,14 +355,23 @@ export default function CustomerDashboard() {
         )}
 
         {/* Modal: Post Request */}
-        {showPostRequest && <PostRequestFlow onClose={() => setShowPostRequest(false)} />}
+        {showPostRequest && (
+          <PostRequestFlow 
+            onClose={() => { setShowPostRequest(false); setPostRequestInitialData(null); }} 
+            initialData={postRequestInitialData}
+          />
+        )}
 
         {/* Main View Area */}
         {activeTab === 'profile' ? (
           <UserProfile />
+        ) : activeTab === 'currentWork' ? (
+          <div style={{ padding: '0 0.5rem', animation: 'fadeIn 0.3s' }}>
+            <CurrentWork type="customer" />
+          </div>
         ) : activeTab === 'bookings' ? (
           <div style={{ padding: '0 0.5rem', animation: 'fadeIn 0.3s' }}>
-            <CustomerJobsFlow />
+            <CustomerJobsFlow onAcceptSuccess={() => setActiveTab('currentWork')} />
           </div>
         ) : activeTab === 'schedule' ? (
           <div style={{ padding: '0 0.5rem', animation: 'fadeIn 0.3s' }}>
@@ -373,7 +428,16 @@ export default function CustomerDashboard() {
                       </div>
 
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn btn--primary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}>Book</button>
+                        <button 
+                          className="btn btn--primary" 
+                          style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }} 
+                          onClick={() => {
+                            setPostRequestInitialData({ category: pro.role, provider_id: pro.id });
+                            setShowPostRequest(true);
+                          }}
+                        >
+                          Book
+                        </button>
                         <button className="btn btn--ghost" style={{ padding: '0.3rem', borderRadius: '50%' }}>
                           <span className="material-icons" style={{ fontSize: '1rem' }}>chat</span>
                         </button>
@@ -394,7 +458,32 @@ export default function CustomerDashboard() {
           /* Default Dashboard View */
           <div className="dashboard-grid">
             {/* Left Column */}
-            <div className="dashboard-col-left">
+            <div className="dashboard-col-left" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              
+              {/* Active Job Notification */}
+              {activeJob && (
+                <div 
+                  onClick={() => setActiveTab('currentWork')}
+                  style={{ 
+                    background: 'linear-gradient(135deg, #2b6cb0 0%, #3182ce 100%)', color: 'white', padding: '1.2rem 1.5rem', 
+                    borderRadius: 'var(--radius-xl)', cursor: 'pointer', position: 'relative', overflow: 'hidden',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                  }}
+                >
+                   <div style={{ zIndex: 1 }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)', marginBottom: '0.2rem' }}>Job in Progress</div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>{activeJob.title}</h3>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#48bb78', animation: 'pulse 1.5s infinite' }} />
+                         <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Status: {activeJob.status.replace('_', ' ')}</span>
+                      </div>
+                   </div>
+                   <button className="btn btn--primary" style={{ background: '#fff', color: '#2b6cb0', fontWeight: 800, padding: '0.6rem 1.2rem', fontSize: '0.8rem', borderRadius: '100px' }}>
+                      Track
+                   </button>
+                   <span className="material-icons" style={{ position: 'absolute', right: '-10px', top: '-10px', fontSize: '8rem', color: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }}>engineering</span>
+                </div>
+              )}
               {/* Explore Services */}
               <section className="dash-section">
                 <div className="dash-section__header">
@@ -403,7 +492,7 @@ export default function CustomerDashboard() {
                 </div>
                 <div className="dash-services">
                   {services.map(s => (
-                    <div key={s.name} className="dash-service-card" onClick={() => setSearchQuery(s.name)}>
+                    <div key={s.name} className="dash-service-card" onClick={() => { setSearchQuery(s.name); setActiveTab('dashboard'); }}>
                       <div className="dash-service-icon" style={{ background: `color-mix(in srgb, ${s.color} 12%, transparent)`, color: s.color }}>
                         <span className="material-icons">{s.icon}</span>
                       </div>
@@ -438,7 +527,16 @@ export default function CustomerDashboard() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn btn--primary" style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Book Now</button>
+                      <button 
+                        className="btn btn--primary" 
+                        style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
+                        onClick={() => {
+                          setPostRequestInitialData({ category: 'Electrical', provider_id: 'vikram-singh-id' });
+                          setShowPostRequest(true);
+                        }}
+                      >
+                        Book Now
+                      </button>
                       <button className="btn btn--ghost" style={{ padding: '0.4rem', borderRadius: '50%' }}>
                         <span className="material-icons" style={{ fontSize: '1.1rem' }}>chat</span>
                       </button>
@@ -465,7 +563,16 @@ export default function CustomerDashboard() {
                           <span className="material-icons pro-card__star" style={{ fontSize: '0.8rem' }}>star</span>
                           <strong>{pro.rating}</strong>
                         </div>
-                        <button className="btn btn--outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}>View</button>
+                        <button 
+                          className="btn btn--outline" 
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
+                          onClick={() => {
+                            setPostRequestInitialData({ category: pro.role, provider_id: pro.id });
+                            setShowPostRequest(true);
+                          }}
+                        >
+                          Book
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -476,49 +583,54 @@ export default function CustomerDashboard() {
             {/* Right Column */}
             <div className="dashboard-col-right">
               {/* Rate Recent Service */}
-              <section className="dash-section" style={{ background: '#fff', padding: '1.5rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--outline-variant)' }}>
-                <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Rate Recent Service</h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                  <div className="pro-card__avatar" style={{ '--pro-color': '#2b6cb0', width: '40px', height: '40px', fontSize: '0.8rem' }}>
-                    DW
+              {lastCompletedJob && (
+                <section className="dash-section" style={{ background: '#fff', padding: '1.5rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--outline-variant)' }}>
+                  <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Rate Recent Service</h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="pro-card__avatar" style={{ '--pro-color': '#2b6cb0', width: '40px', height: '40px', fontSize: '0.8rem' }}>
+                      {lastCompletedJob.service_providers?.name?.[0]}
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '0.9rem', marginBottom: '0.1rem' }}>{lastCompletedJob.service_providers?.name}</h4>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)' }}>{lastCompletedJob.title} &middot; {new Date(lastCompletedJob.actual_completion_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 style={{ fontSize: '0.9rem', marginBottom: '0.1rem' }}>David Wilson</h4>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)' }}>Master Electrician &middot; Oct 12</p>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <span
+                        key={star}
+                        className="material-icons"
+                        style={{
+                          color: (hoverRating || rating) >= star ? '#d69e2e' : 'var(--outline-variant)',
+                          cursor: 'pointer',
+                          fontSize: '1.8rem',
+                          transition: 'color 0.2s',
+                          lineHeight: 1
+                        }}
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        onClick={() => setRating(star)}
+                      >
+                        {star <= (hoverRating || rating) ? 'star' : 'star_border'}
+                      </span>
+                    ))}
                   </div>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <span
-                      key={star}
-                      className="material-icons"
-                      style={{
-                        color: (hoverRating || rating) >= star ? '#d69e2e' : 'var(--outline-variant)',
-                        cursor: 'pointer',
-                        fontSize: '1.8rem',
-                        transition: 'color 0.2s',
-                        lineHeight: 1
-                      }}
-                      onMouseEnter={() => setHoverRating(star)}
-                      onMouseLeave={() => setHoverRating(0)}
-                      onClick={() => setRating(star)}
-                    >
-                      {star <= (hoverRating || rating) ? 'star' : 'star_border'}
-                    </span>
-                  ))}
-                </div>
-                <button
-                  className="btn btn--primary"
-                  style={{ width: '100%', padding: '0.6rem', fontSize: '0.85rem' }}
-                  disabled={rating === 0}
-                  onClick={() => {
-                    alert(`Thank you for rating David Wilson ${rating} stars!`);
-                    setRating(0);
-                  }}
-                >
-                  Submit Rating
-                </button>
-              </section>
+                  <button
+                    className="btn btn--primary"
+                    style={{ width: '100%', padding: '0.6rem', fontSize: '0.85rem' }}
+                    disabled={rating === 0}
+                    onClick={async () => {
+                      // Update pro rating (simulated) or just clear
+                      await supabase.from('jobs').update({ status: 'finished' }).eq('id', lastCompletedJob.id)
+                      alert(`Thank you for rating ${lastCompletedJob.service_providers?.name} ${rating} stars!`);
+                      setRating(0);
+                      setLastCompletedJob(null);
+                    }}
+                  >
+                    Submit Rating
+                  </button>
+                </section>
+              )}
 
               {/* Recent Messages */}
               <section className="dash-section">

@@ -96,10 +96,10 @@ function ModalShell({ step, onClose, children }) {
 }
 
 /* ─────────────────────────────────────────────────────── */
-export default function PostRequestFlow({ onClose }) {
-  const [step, setStep] = useState(1)
+export default function PostRequestFlow({ onClose, initialData }) {
+  const [step, setStep] = useState(initialData?.category ? 2 : 1)
   const [form, setForm] = useState({
-    service: '',
+    service: initialData?.category || '',
     title: '',
     description: '',
     photos: false,
@@ -110,6 +110,7 @@ export default function PostRequestFlow({ onClose }) {
     date: '',
     location: 'Sector 21, Gurgaon',
     radius: '5',
+    provider_id: initialData?.provider_id || null, // Optional tracking
   })
   const [audioBlob, setAudioBlob] = useState(null)
   const [search, setSearch] = useState('')

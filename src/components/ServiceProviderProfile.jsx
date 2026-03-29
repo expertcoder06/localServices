@@ -19,6 +19,25 @@ export default function ServiceProviderProfile({ isEditable = false }) {
 
   useEffect(() => {
     async function loadProfile() {
+      // If a provider's data is passed as a prop, use it (READ-ONLY VIEW)
+      if (provider && provider.id && !isEditable) {
+        setProData({
+          ...provider,
+          businessName: provider.name || 'Service Professional',
+          role: provider.service_name || 'Expert',
+          email: provider.email || 'Protected',
+          phone: provider.phone || 'Protected',
+          location: provider.location || (provider.city ? `${provider.city}, ${provider.state}` : 'Location Hidden'),
+          logo: provider.photo_url,
+          experience: provider.experience || 'Experienced',
+          status: provider.status === 'approved' ? 'Verified Expert' : 'Verified Provider',
+          rate: provider.hourly_rate ? `₹${provider.hourly_rate} / hr` : 'Contact for Quote',
+          categories: provider.categories || []
+        })
+        return
+      }
+
+      // SELF-VIEW: Load the current logged-in user's profile
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
@@ -53,7 +72,7 @@ export default function ServiceProviderProfile({ isEditable = false }) {
       }
     }
     loadProfile()
-  }, [])
+  }, [provider, isEditable])
 
   const [tempData, setTempData] = useState({ ...proData })
 
@@ -118,9 +137,9 @@ export default function ServiceProviderProfile({ isEditable = false }) {
   }
 
   const rawStats = {
-    jobs: '432',
-    rating: '4.9',
-    responseTime: '15 mins'
+    jobs: proData.completed_jobs || '432',
+    rating: proData.rating || '4.9',
+    responseTime: proData.response_time || '15 mins'
   }
 
   const trustScore = calculateTrustScore(rawStats.rating, rawStats.jobs, rawStats.responseTime)

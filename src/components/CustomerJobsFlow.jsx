@@ -54,19 +54,18 @@ export default function CustomerJobsFlow() {
   async function fetchJobAndBids(userId) {
     setLoading(true)
     try {
-      // 1. Get all jobs for this consumer
-      const { data: jobsData, error: jobsError } = await supabase
+      const { data: jobsData, error: jobsErr } = await supabase
         .from('jobs')
         .select('*')
         .eq('consumer_id', userId)
         .order('created_at', { ascending: false })
 
-      if (jobsError) throw jobsError
+      if (jobsErr) throw jobsErr
       setJobs(jobsData || [])
 
+      // Fetch bid counts for all jobs
       if (jobsData && jobsData.length > 0) {
-        // 2. Get bid counts for all jobs
-        const { data: countsData, error: countsError } = await supabase
+        const { data: bidsData, error: bidsErr } = await supabase
           .from('bids')
           .select('job_id')
           .in('job_id', jobsData.map(j => j.id))
@@ -99,10 +98,8 @@ export default function CustomerJobsFlow() {
         }
         return activeJob
       }
-      return null
     } catch (err) {
-      console.error('Error fetching job/bids:', err)
-      return null
+      console.error('Error fetching jobs/bids:', err)
     } finally {
       setLoading(false)
     }
@@ -209,144 +206,6 @@ export default function CustomerJobsFlow() {
     }
   }
 
-  if (view === 'bids') {
-    const activeJob = selectedJob || jobs[0]
-    return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '1.8rem', fontWeight: 800 }}>
-            {loading ? '⏳ Loading Bids...' : activeJob ? `🔥 ${bidCounts[activeJob.id] || 0} Bid${(bidCounts[activeJob.id] || 0) !== 1 ? 's' : ''} for "${activeJob.title}"` : 'No Active Job Requests'}
-          </h1>
-        </div>
-        <p style={{ fontSize: '0.9rem', color: 'var(--on-surface-variant)', marginBottom: '2rem' }}>
-          Expert professionals are ready to assist you. Review their proposals and hire the best match for your project.
-        </p>
-
-        {loading && (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--on-surface-variant)' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
-            <p>Fetching your bids...</p>
-          </div>
-        )}
-
-        {!loading && jobs.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '3rem', background: '#fff', borderRadius: 'var(--radius-xl)', border: '1px solid var(--outline-variant)' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📝</div>
-            <h3 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>No Active Requests</h3>
-            <p style={{ color: 'var(--on-surface-variant)', fontSize: '0.9rem' }}>You haven't posted any job requests yet. Post a request to start receiving bids!</p>
-          </div>
-        )}
-
-        {!loading && jobs.length > 0 && bids.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '3rem', background: '#fff', borderRadius: 'var(--radius-xl)', border: '1px solid var(--outline-variant)' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⌛</div>
-            <h3 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>Waiting for Bids</h3>
-            <p style={{ color: 'var(--on-surface-variant)', fontSize: '0.9rem' }}>Providers are reviewing your request. You'll see bids here as soon as they arrive.</p>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {bids.map((bid, i) => {
-            const provider = bid.service_providers || {}
-            const initials = provider.name
-              ? provider.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-              : '??'
-            const trustScore = provider.trust_score ?? 0
-            const isHighTrust = trustScore >= 8.5
-            const location = [provider.city, provider.state].filter(Boolean).join(', ')
-            const serviceLabel = provider.categories?.[0] || 'Professional Service'
-
-            // Mock Availability Data (Fixed per provider for consistency)
-            const seed = bid.provider_id ? bid.provider_id.slice(-1).charCodeAt(0) : i
-            const slots = [
-                { time: '8AM', status: (seed % 3 === 0) ? 'busy' : 'free' },
-                { time: '10AM', status: (seed % 2 === 0) ? 'busy' : 'free' },
-                { time: '12PM', status: (seed % 5 === 0) ? 'busy' : 'free' },
-                { time: '2PM', status: (seed % 4 === 0) ? 'busy' : 'free' },
-                { time: '4PM', status: 'free' },
-                { time: '6PM', status: (seed % 7 === 0) ? 'busy' : 'free' },
-                { time: '8PM', status: 'free' },
-            ]
-
-            return (
-              <div key={bid.id} style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '1.5rem', border: '1px solid var(--outline-variant)', boxShadow: i === 0 ? 'var(--shadow-sm)' : 'none' }}>
-                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
-                  {provider.photo_url ? (
-                    <img src={provider.photo_url} alt={provider.name} style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--outline-variant)' }} />
-                  ) : (
-                    <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(49,130,206,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3182ce', fontWeight: 700, fontSize: '1.2rem', flexShrink: 0 }}>
-                      {initials}
-                    </div>
-                  )}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{provider.name || 'Anonymous Provider'}</h3>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
-                        ₹{bid.amount}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.75rem' }}>
-                      <span style={{ fontSize: '0.75rem', background: isHighTrust ? 'rgba(56,161,105,0.1)' : 'var(--surface-container)', color: isHighTrust ? '#38a169' : 'var(--on-surface-variant)', padding: '0.2rem 0.6rem', borderRadius: '100px', fontWeight: 700 }}>
-                        ⭐ Trust Score: {trustScore}/10
-                      </span>
-                      {isHighTrust && (
-                        <span style={{ fontSize: '0.75rem', background: 'rgba(214,158,46,0.1)', color: '#d69e2e', padding: '0.2rem 0.6rem', borderRadius: '100px', fontWeight: 700 }}>Highly Trusted</span>
-                      )}
-                      {location && (
-                        <span style={{ fontSize: '0.75rem', background: 'var(--surface-container)', color: 'var(--on-surface-variant)', padding: '0.2rem 0.6rem', borderRadius: '100px', fontWeight: 600 }}>📍 {location}</span>
-                      )}
-                    </div>
-
-                    <p style={{ fontSize: '0.82rem', color: 'var(--on-surface-variant)', marginBottom: '1.2rem' }}>{serviceLabel}</p>
-
-                    {/* Schedule Bar Section */}
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                Availability Today
-                            </span>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--outline)', fontWeight: 600 }}>
-                                <span style={{ color: '#3182ce' }}>●</span> Free Slots
-                            </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '4px', height: '12px', width: '100%', marginBottom: '0.4rem' }}>
-                            {slots.map((s, idx) => (
-                                <div key={idx} style={{
-                                    flex: 1,
-                                    background: s.status === 'free' ? 'linear-gradient(to right, #48bb78, #38a169)' : 'var(--outline-variant)',
-                                    borderRadius: '6px',
-                                    position: 'relative',
-                                    overflow: 'visible',
-                                    transition: 'transform 0.2s',
-                                    cursor: 'help'
-                                }}
-                                title={`${s.time}: ${s.status === 'free' ? 'Available' : 'Booked'}`}
-                                onMouseEnter={e => e.currentTarget.style.transform = 'scaleY(1.3)'}
-                                onMouseLeave={e => e.currentTarget.style.transform = 'scaleY(1)'}
-                                />
-                            ))}
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 2px' }}>
-                            {slots.map((s, idx) => (
-                                <span key={idx} style={{ fontSize: '0.55rem', color: 'var(--outline)', fontWeight: 700 }}>{s.time}</span>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                      <button className="btn btn--outline" style={{ flex: 1, padding: '0.6rem' }}>View Profile</button>
-                      <button className="btn btn--primary" style={{ flex: 2, padding: '0.6rem' }} onClick={() => handleAcceptBid(bid)}>Accept Bid</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
 
   const fetchBids = async (jobId) => {
     try {
@@ -479,16 +338,21 @@ export default function CustomerJobsFlow() {
             bids.map(bid => (
               <div key={bid.id} style={{ background: '#fff', borderRadius: 'var(--radius-xl)', padding: '1.5rem', border: '1px solid var(--outline-variant)', boxShadow: 'var(--shadow-sm)' }}>
                 <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
-                  <div style={{ 
-                    width: '56px', height: '56px', borderRadius: '50%', 
-                    background: 'rgba(49,130,206,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                    color: '#3182ce', fontWeight: 700, fontSize: '1.2rem' 
-                  }}>
+                  <div 
+                    onClick={() => setViewProfileProvider(bid.provider)}
+                    style={{ 
+                      width: '56px', height: '56px', borderRadius: '50%', 
+                      background: 'rgba(49,130,206,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                      color: '#3182ce', fontWeight: 700, fontSize: '1.2rem',
+                      cursor: 'pointer'
+                    }}>
                     {bid.provider?.name?.charAt(0) || 'P'}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{bid.provider?.name || 'Service Provider'}</h3>
+                      <h3 
+                        onClick={() => setViewProfileProvider(bid.provider)}
+                        style={{ fontSize: '1.1rem', fontWeight: 700, cursor: 'pointer' }}>{bid.provider?.name || 'Service Provider'}</h3>
                       <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)' }}>₹{bid.amount}</div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -503,7 +367,7 @@ export default function CustomerJobsFlow() {
                       "{bid.message || 'I would like to help you with this project.'}"
                     </p>
                     <div style={{ display: 'flex', gap: '1rem' }}>
-                      <button className="btn btn--outline" style={{ flex: 1, padding: '0.6rem' }} onClick={() => setViewProfileProvider(bid.provider)}>View Profile</button>
+                      <button className="btn btn--outline" style={{ flex: 1, padding: '0.6rem' }} onClick={() => setViewProfileProvider(bid.provider || bid.service_providers)}>View Profile</button>
                       <button className="btn btn--primary" style={{ flex: 2, padding: '0.6rem' }} onClick={() => handleAcceptBid(bid)}>Accept Proposal</button>
                     </div>
                   </div>
@@ -675,9 +539,22 @@ export default function CustomerJobsFlow() {
         </div>
         <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '1rem' }}>Booking Confirmed!</h1>
         <p style={{ fontSize: '1rem', color: 'var(--on-surface-variant)', lineHeight: 1.6, marginBottom: '2.5rem' }}>
-          Your payment is held in escrow. The professional will reach out to you shortly to start the work.
+          Your payment is held in escrow. The professional will reach out to you shortly to start the work. You can now track the project in real-time.
         </p>
-        <button className="btn btn--primary" style={{ width: '100%', padding: '1.2rem', fontSize: '1.1rem', borderRadius: 'var(--radius-xl)' }} onClick={() => setView('job_list')}>
+        <button 
+          className="btn btn--primary" 
+          style={{ width: '100%', padding: '1.2rem', fontSize: '1.1rem', borderRadius: 'var(--radius-xl)', marginBottom: '1rem' }} 
+          onClick={() => {
+            if (onAcceptSuccess) {
+              onAcceptSuccess()
+            } else {
+              setView('job_list')
+            }
+          }}
+        >
+          Track My Work
+        </button>
+        <button className="btn btn--ghost" style={{ width: '100%', padding: '0.8rem' }} onClick={() => setView('job_list')}>
           Manage Bookings
         </button>
       </div>
