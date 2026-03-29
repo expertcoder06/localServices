@@ -111,7 +111,7 @@ const Signup = () => {
     setServerOtp(generatedOtp);
     
     try {
-      const response = await axios.post('http://localhost:5000/send-otp', { email: formData.email, otp: generatedOtp });
+      const response = await axios.post('https://api-node-emailverification.onrender.com/send-otp', { email: formData.email, otp: generatedOtp });
       
       if (response.status !== 200) {
         throw new Error("Failed to send verification email");

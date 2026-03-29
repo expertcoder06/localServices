@@ -84,7 +84,7 @@ export default function CustomerJobsFlow({ onAcceptSuccess }) {
             .eq('id', userId)
             .single()
 
-          axios.post('http://localhost:5000/start-bid-alert', {
+          axios.post('https://api-node-emailverification.onrender.com/start-bid-alert', {
               jobId: activeJob.id,
               consumerEmail: consumer?.email,
               consumerName: consumer?.name,

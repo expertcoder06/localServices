@@ -1126,7 +1126,7 @@ export default function ProviderDashboard() {
                                        .eq('id', consumerId)
                                        .maybeSingle();
                                      if (consumerRow?.email) {
-                                       await axios.post('http://localhost:5000/send-bid-placed', {
+                                       await axios.post('https://api-node-emailverification.onrender.com/send-bid-placed', {
                                            customerEmail: consumerRow.email,
                                            customerName:  consumerRow.name || 'Customer',
                                            providerName,

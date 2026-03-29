@@ -101,7 +101,7 @@ export default function AiBiddingSystem() {
       setSubmitted(prev => new Set([...prev, selectedJob.id]))
       
       // Call the email provider endpoint to start bid alerts for the customer
-      axios.post('http://localhost:5000/start-bid-alert', {
+      axios.post('https://api-node-emailverification.onrender.com/start-bid-alert', {
           jobId: selectedJob.id,
           jobTitle: selectedJob.title
       }).catch(err => console.warn('Bid alert failed:', err))

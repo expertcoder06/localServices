@@ -72,7 +72,7 @@ const Login = () => {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(code);
 
-      const response = await axios.post('http://localhost:5000/send-otp', { email, otp: code });
+      const response = await axios.post('https://api-node-emailverification.onrender.com/send-otp', { email, otp: code });
       
       if (!response.data.success) throw new Error(response.data.message);
 
