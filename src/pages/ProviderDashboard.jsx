@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../utils/supabaseClient'
 import axios from 'axios'
@@ -154,11 +154,30 @@ function ProviderBidsView({ providerId }) {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {bids.map(bid => (
-            <div key={bid.id} style={{ background: '#fff', borderRadius: 'var(--radius-lg)', padding: '1.5rem', border: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {bids.map((bid) => (
+            <div 
+              key={bid.id} 
+              style={{ 
+                background: '#fff', 
+                borderRadius: 'var(--radius-lg)', 
+                padding: '1.5rem', 
+                border: '1px solid var(--outline-variant)', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center' 
+              }}
+            >
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
-                  <span style={{ fontSize: '0.65rem', background: bid.status === 'accepted' ? 'rgba(56,161,105,0.1)' : 'var(--surface-container)', color: bid.status === 'accepted' ? '#38a169' : 'var(--on-surface-variant)', padding: '0.2rem 0.6rem', borderRadius: '40px', fontWeight: 800, textTransform: 'uppercase' }}>
+                  <span style={{ 
+                    fontSize: '0.65rem', 
+                    background: bid.status === 'accepted' ? 'rgba(56,161,105,0.1)' : 'var(--surface-container)', 
+                    color: bid.status === 'accepted' ? '#38a169' : 'var(--on-surface-variant)', 
+                    padding: '0.2rem 0.6rem', 
+                    borderRadius: '40px', 
+                    fontWeight: 800, 
+                    textTransform: 'uppercase' 
+                  }}>
                     {bid.status}
                   </span>
                   <span style={{ fontSize: '0.7rem', color: 'var(--outline)' }}>
@@ -176,14 +195,18 @@ function ProviderBidsView({ providerId }) {
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)' }}>₹{bid.amount}</div>
-                {bid.status === 'accepted' && <button className="btn btn--primary" style={{ marginTop: '0.5rem', padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>Open Workspace</button>}
+                {bid.status === 'accepted' && (
+                  <button className="btn btn--primary" style={{ marginTop: '0.5rem', padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>
+                    Open Workspace
+                  </button>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
     </div>
-  )
+  );
 }
 
 
@@ -204,12 +227,10 @@ export default function ProviderDashboard() {
   const [locationError, setLocationError] = useState(null)
   const [user, setUser] = useState(null)
   const [promisedHours, setPromisedHours] = useState(2) // Default 2 hours
-  const [isLocating, setIsLocating] = useState(false)
-  const [locationError, setLocationError] = useState(null)
-  const [user, setUser] = useState(null)
 
   const haversineDistance = (lat1, lon1, lat2, lon2) => {
-    if (!lat1 || !lon1 || !lat2 || !lon2) return null
+    if (lat1 === undefined || lon1 === undefined || lat2 === undefined || lon2 === undefined) return null
+    if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) return null
     const R = 6371 // km
     const dLat = (lat2 - lat1) * Math.PI / 180
     const dLon = (lon2 - lon1) * Math.PI / 180
@@ -219,22 +240,6 @@ export default function ProviderDashboard() {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     return R * c
   }
-
-  const updateDistances = () => {
-    if (!providerLocation || liveRequests.length === 0) return;
-    setLiveRequests(prev => prev.map(req => {
-      const dist = haversineDistance(providerLocation.lat, providerLocation.lon, req.latitude, req.longitude);
-      return {
-        ...req,
-        distanceValue: dist,
-        distance: dist ? (dist < 1 ? `${(dist * 1000).toFixed(0)} m` : `${dist.toFixed(1)} km`) : 'Live'
-      };
-    }));
-  };
-
-  useEffect(() => {
-    updateDistances();
-  }, [providerLocation, liveRequests]); // Added liveRequests to dependency array to ensure it re-runs if liveRequests changes before providerLocation
 
   const fetchProviderLocation = () => {
     setIsLocating(true)
@@ -256,142 +261,133 @@ export default function ProviderDashboard() {
 
   useEffect(() => {
     const fetchJobs = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('jobs')
         .select('*, consumers(name, photo_url)')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-  useEffect(() => {
+      if (error) {
+        console.error('Error fetching jobs:', error);
+        return;
+      }
+
+      if (data) {
+        const fetchColor = (cat) => {
+          const map = {
+            'Plumbing': '#2b6cb0', 'Electrical': '#d69e2e', 'Cleaning': '#38a169', 'AC Repair': '#319795',
+            'Carpentry': '#805ad5', 'Painting': '#dd6b20', 'Personal Trainer': '#e53e3e', 'Interior Design': '#9f7aea',
+            'Pest Control': '#38a169', 'CCTV / Security': '#e53e3e', 'Catering': '#d69e2e', 'Yoga / Wellness': '#3182ce'
+          };
+          return map[cat] || '#718096';
+        };
+
+        const fetchIcon = (cat) => {
+          const map = {
+            'Plumbing': 'plumbing', 'Electrical': 'bolt', 'Cleaning': 'cleaning_services', 'AC Repair': 'ac_unit',
+            'Carpentry': 'build', 'Painting': 'format_paint', 'Personal Trainer': 'fitness_center', 'Interior Design': 'design_services',
+            'Pest Control': 'pest_control', 'CCTV / Security': 'camera_indoor', 'Catering': 'local_dining', 'Yoga / Wellness': 'spa'
+          };
+          return map[cat] || 'more_horiz';
+        };
+
+        const mapped = data.map(dbJob => ({
+          id: dbJob.id,
+          title: dbJob.title,
+          category: dbJob.category,
+          icon: fetchIcon(dbJob.category),
+          color: fetchColor(dbJob.category),
+          budgetMin: dbJob.budget_min || (dbJob.budget ? Math.max(0, dbJob.budget - 500) : 0),
+          budgetMax: dbJob.budget_max || dbJob.budget || 0,
+          latitude: dbJob.latitude,
+          longitude: dbJob.longitude,
+          urgency: dbJob.timeline === 'urgent' ? 'Urgent' : 'New',
+          postedAt: new Date(dbJob.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+          address: dbJob.location || 'Unknown',
+          description: dbJob.description || '',
+          audio_url: dbJob.audio_url,
+          timeline: dbJob.timeline,
+          preferred_date: dbJob.preferred_date ? new Date(dbJob.preferred_date).toLocaleDateString() : 'ASAP',
+          customerName: dbJob.consumers?.name || 'Customer',
+          customerPhoto: dbJob.consumers?.photo_url,
+          consumer_id: dbJob.consumer_id
+        }));
+        setLiveRequests(mapped);
+      }
+    };
+
+    const fetchMyBids = async (userId) => {
+      const { data, error } = await supabase
+        .from('bids')
+        .select('*, job:jobs(*)')
+        .eq('provider_id', userId)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.error('Error fetching provider bids:', error);
+      } else if (data) {
+        setProviderBids(data);
+        setAcceptedJobs(new Set(data.map(b => b.job_id)));
+      }
+    };
+
     const init = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       setUser(authUser)
-      
-      const fetchJobs = async () => {
-        const { data, error } = await supabase
-          .from('jobs')
-          .select('*, consumers(name, photo_url)')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false });
-
-        if (data) {
-          const fetchColor = (cat) => {
-            const map = {
-              'Plumbing': '#2b6cb0', 'Electrical': '#d69e2e', 'Cleaning': '#38a169', 'AC Repair': '#319795',
-              'Carpentry': '#805ad5', 'Painting': '#dd6b20', 'Personal Trainer': '#e53e3e', 'Interior Design': '#9f7aea',
-              'Pest Control': '#38a169', 'CCTV / Security': '#e53e3e', 'Catering': '#d69e2e', 'Yoga / Wellness': '#3182ce'
-            };
-            return map[cat] || '#718096';
-          };
-
-          const fetchIcon = (cat) => {
-            const map = {
-              'Plumbing': 'plumbing', 'Electrical': 'bolt', 'Cleaning': 'cleaning_services', 'AC Repair': 'ac_unit',
-              'Carpentry': 'build', 'Painting': 'format_paint', 'Personal Trainer': 'fitness_center', 'Interior Design': 'design_services',
-              'Pest Control': 'pest_control', 'CCTV / Security': 'camera_indoor', 'Catering': 'local_dining', 'Yoga / Wellness': 'spa'
-            };
-            return map[cat] || 'more_horiz';
-          };
-
-          const mapped = data.map(dbJob => {
-            const dist = providerLocation ? haversineDistance(providerLocation.lat, providerLocation.lon, dbJob.latitude, dbJob.longitude) : null
-            
-            return {
-              id: dbJob.id,
-              title: dbJob.title,
-              category: dbJob.category,
-              icon: fetchIcon(dbJob.category),
-              color: fetchColor(dbJob.category),
-              budgetMin: dbJob.budget_min || (dbJob.budget ? Math.max(0, dbJob.budget - 500) : 0),
-              budgetMax: dbJob.budget_max || dbJob.budget || 0,
-              distance: dist ? `${dist.toFixed(1)} km` : 'Live',
-              distanceValue: dist,
-              urgency: dbJob.timeline === 'urgent' ? 'Urgent' : 'New',
-              postedAt: new Date(dbJob.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-              address: dbJob.location || 'Unknown',
-              description: dbJob.description || '',
-              audio_url: dbJob.audio_url,
-              timeline: dbJob.timeline,
-              preferred_date: dbJob.preferred_date ? new Date(dbJob.preferred_date).toLocaleDateString() : 'ASAP',
-              customerName: dbJob.consumers?.name || 'Customer',
-              customerPhoto: dbJob.consumers?.photo_url,
-              consumer_id: dbJob.consumer_id
-            }
-          });
-          setLiveRequests(mapped);
-        }
-      };
-
-      const fetchMyBids = async () => {
-        if (!authUser) return;
-        const { data } = await supabase
-          .from('bids')
-          .select('*, job:jobs(*)')
-          .eq('provider_id', authUser.id)
-          .order('created_at', { ascending: false });
-        if (data) {
-          setProviderBids(data);
-          setAcceptedJobs(prev => new Set([...prev, ...data.map(b => b.job_id)]));
-        }
-      };
-
-    const fetchMyBids = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-         setUser(user);
-         const { data } = await supabase
-           .from('bids')
-           .select('*, job:jobs(*)')
-           .eq('provider_id', user.id)
-           .order('created_at', { ascending: false });
-         if (data) {
-           setProviderBids(data);
-           setAcceptedJobs(prev => new Set([...prev, ...data.map(b => b.job_id)]));
-         }
+      if (authUser) {
+        await fetchJobs()
+        await fetchMyBids(authUser.id)
+      } else {
+        await fetchJobs()
       }
-    };
+    }
 
     init();
 
     const subscription = supabase.channel('public:jobs_and_bids')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
-        init();
+        fetchJobs();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bids' }, () => {
-        init();
+        supabase.auth.getUser().then(({data: {user}}) => {
+          if (user) fetchMyBids(user.id);
+        });
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, []); // Only on mount, Supabase changes handle the rest. Location is handled by updateDistances.
+  }, []);
 
-  const visibleRequests = [...liveRequests, ...MOCK_REQUESTS]
-    .filter(r => {
-      if (declinedJobs.has(r.id)) return false
-      if (providerLocation && r.distanceValue !== undefined && r.distanceValue !== null) {
-        return r.distanceValue <= radius
-      }
-      return true
-    })
-    .sort((a, b) => {
-      // 1. Distance (Primary - Nearest first)
-      if (a.distanceValue !== null && b.distanceValue !== null) {
-        if (a.distanceValue !== b.distanceValue) {
-          return a.distanceValue - b.distanceValue;
+  const visibleRequests = useMemo(() => {
+    const list = [...liveRequests, ...MOCK_REQUESTS]
+      .map(req => {
+        const dist = providerLocation ? haversineDistance(providerLocation.lat, providerLocation.lon, req.latitude, req.longitude) : null;
+        return {
+          ...req,
+          distanceValue: dist,
+          distance: dist ? (dist < 1 ? `${(dist * 1000).toFixed(0)} m` : `${dist.toFixed(1)} km`) : (req.distance || 'Live')
+        };
+      })
+      .filter(r => {
+        if (declinedJobs.has(r.id)) return false
+        if (providerLocation && r.distanceValue !== null) {
+          return r.distanceValue <= radius
         }
+        return true
+      });
+
+    return list.sort((a, b) => {
+      if (a.distanceValue !== null && b.distanceValue !== null) {
+        if (a.distanceValue !== b.distanceValue) return a.distanceValue - b.distanceValue;
       }
-      
-      // 2. Urgency (Secondary)
       const urgencyScore = { 'urgent': 3, 'immediate': 3, 'flexible': 1, 'ASAP': 2 };
       const scoreA = urgencyScore[a.timeline] || 0;
       const scoreB = urgencyScore[b.timeline] || 0;
       if (scoreA !== scoreB) return scoreB - scoreA;
-
-      // 3. Budget (Tertiary - Higher first)
-      return b.budgetMax - a.budgetMax;
+      return (b.budgetMax || 0) - (a.budgetMax || 0);
     });
+  }, [liveRequests, providerLocation, radius, declinedJobs]);
 
   return (
     <div className="dashboard-layout">
@@ -636,7 +632,6 @@ export default function ProviderDashboard() {
                 </h2>
               </div>
 
-              {/* Location & Radius Filter Bar */}
               <div style={{
                 background: 'linear-gradient(135deg, rgba(26,54,93,0.04) 0%, rgba(49,130,206,0.06) 100%)',
                 borderRadius: 'var(--radius-lg)',
@@ -652,120 +647,98 @@ export default function ProviderDashboard() {
                       <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Detecting Location...</span>
                     </div>
                   </div>
-                  {!providerLocation && !isLocating && (
-                    <button
-                      onClick={() => {
-                        setIsLocating(true)
-                        navigator.geolocation.getCurrentPosition(
-                          (pos) => {
-                            setProviderLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-                            setIsLocating(false)
-                            setLocationError(null)
-                          },
-                          () => {
-                            setLocationError('Permission denied')
-                            setIsLocating(false)
-                          }
-                        )
-                      }}
-                      style={{
-                        background: 'var(--primary)', color: 'white', border: 'none',
-                        borderRadius: 'var(--radius-md)', padding: '0.6rem 1.5rem',
-                        fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer',
-                        display: 'inline-flex', alignItems: 'center', gap: '8px',
-                      }}
-                    >
-                      <span className="material-icons" style={{ fontSize: '1.1rem' }}>my_location</span>
-                      Enable Location
-                    </button>
-                  )}
-                </div>
-
-                {/* Radius Slider */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Search Radius
-                    </label>
-                    <span style={{
-                      fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)',
-                      background: 'var(--primary-container)', padding: '2px 10px',
-                      borderRadius: '100px',
-                    }}>
-                      {radius} km
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="50"
-                    value={radius}
-                    onChange={e => setRadius(parseInt(e.target.value))}
-                    style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--primary)', height: '6px' }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--outline)', marginTop: '2px' }}>
-                    <span>1 km</span>
-                    <span>25 km</span>
-                    <span>50 km</span>
-                  </div>
                 ) : (
                   <>
-                    {/* Location Status */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                        <div style={{
-                          width: '36px', height: '36px', borderRadius: '12px',
-                          background: providerLocation ? 'rgba(56,161,105,0.1)' : 'rgba(49,130,206,0.1)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          boxShadow: 'inset 0 0 0 1px var(--outline-variant)'
-                        }}>
-                          <span className="material-icons" style={{
-                            fontSize: '1.2rem',
-                            color: providerLocation ? '#38a169' : '#3182ce',
-                            animation: isLocating ? 'pulse 1.5s infinite' : 'none'
-                          }}>
-                            {providerLocation ? 'my_location' : 'sync'}
-                          </span>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--on-surface)' }}>
-                            {providerLocation ? 'Live Tracking Active' : 'Detecting Location...'}
-                          </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', fontWeight: 500 }}>
-                            {providerLocation 
-                              ? `Position: ${providerLocation.lat.toFixed(4)}, ${providerLocation.lon.toFixed(4)}` 
-                              : 'Acquiring GPS signal...'}
-                          </div>
-                        </div>
+                    {!providerLocation ? (
+                      <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--on-surface-variant)', marginBottom: '1rem' }}>
+                          Enable location to see requests near you.
+                        </p>
+                        <button
+                          onClick={fetchProviderLocation}
+                          className="btn btn--primary"
+                          style={{
+                            padding: '0.6rem 1.5rem',
+                            fontSize: '0.85rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <span className="material-icons" style={{ fontSize: '1.1rem' }}>my_location</span>
+                          Enable Location
+                        </button>
                       </div>
-                      
-                      {providerLocation && (
+                    ) : (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                          <div style={{
+                            width: '36px', height: '36px', borderRadius: '12px',
+                            background: 'rgba(56,161,105,0.1)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: 'inset 0 0 0 1px var(--outline-variant)'
+                          }}>
+                            <span className="material-icons" style={{ fontSize: '1.2rem', color: '#38a169' }}>my_location</span>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--on-surface)' }}>Live Tracking Active</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', fontWeight: 500 }}>
+                              Position: {providerLocation.lat.toFixed(4)}, {providerLocation.lon.toFixed(4)}
+                            </div>
+                          </div>
+                        </div>
                         <button 
                           onClick={fetchProviderLocation}
-                          title="Refresh Location"
                           style={{ 
                             background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)',
                             padding: '4px', borderRadius: '50%', display: 'flex', alignItems: 'center'
                           }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-container-high)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'none'}
                         >
                           <span className="material-icons" style={{ fontSize: '1.1rem' }}>refresh</span>
                         </button>
-                      )}
+                      </div>
+                    )}
+
+                    <div style={{ borderTop: '1px solid var(--outline-variant)', margin: '1rem 0', pt: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', marginTop: '1rem' }}>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Search Radius
+                        </label>
+                        <span style={{
+                          fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)',
+                          background: 'var(--primary-container)', padding: '2px 10px',
+                          borderRadius: '100px',
+                        }}>
+                          {radius} km
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="50"
+                        value={radius}
+                        onChange={e => setRadius(parseInt(e.target.value))}
+                        style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--primary)', height: '6px' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--outline)', marginTop: '4px' }}>
+                        <span>1 km</span>
+                        <span>25 km</span>
+                        <span>50 km</span>
+                      </div>
                     </div>
 
-                {/* Filter summary */}
-                {providerLocation && (
-                  <div style={{
-                    marginTop: '0.6rem', paddingTop: '0.6rem',
-                    borderTop: '1px solid var(--outline-variant)',
-                    display: 'flex', alignItems: 'center', gap: '0.4rem',
-                    fontSize: '0.72rem', color: 'var(--on-surface-variant)',
-                  }}>
-                    <span className="material-icons" style={{ fontSize: '0.85rem', color: '#3182ce' }}>filter_alt</span>
-                    Showing <strong style={{ color: 'var(--primary)' }}>{visibleRequests.length}</strong> request{visibleRequests.length !== 1 ? 's' : ''} within {radius} km
-                  </div>
+                    {providerLocation && (
+                      <div style={{
+                        marginTop: '0.8rem', paddingTop: '0.8rem',
+                        borderTop: '1px solid var(--outline-variant)',
+                        display: 'flex', alignItems: 'center', gap: '0.4rem',
+                        fontSize: '0.72rem', color: 'var(--on-surface-variant)',
+                      }}>
+                        <span className="material-icons" style={{ fontSize: '0.85rem', color: '#3182ce' }}>filter_alt</span>
+                        Showing <strong style={{ color: 'var(--primary)' }}>{visibleRequests.length}</strong> nearby requests
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 

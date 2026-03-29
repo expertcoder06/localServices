@@ -26,14 +26,9 @@ export default function Chatbot() {
 
   // ── Method 1: Custom Event handler ──
   const handleCustomEvent = useCallback((event) => {
-    console.log('[Chatbot] Custom Event Received:', event)
     const payload = event?.payload || event
 
     if (payload?.type === 'navigate' && payload?.path) {
-      console.log(
-        `[Chatbot] Navigating to "${payload.path}"` +
-          (payload.search ? ` with search: "${payload.search}"` : '')
-      )
       navigateRef.current(payload.path, {
         state: payload.search ? { searchQuery: payload.search } : undefined,
       })
@@ -95,11 +90,6 @@ export default function Chatbot() {
           targetPath = '/' + hashValue
         }
       }
-
-      console.log(
-        `[Chatbot] Intercepted link: "${href}" → navigating to "${targetPath}"` +
-          (search ? ` with search: "${search}"` : '')
-      )
 
       navigateRef.current(targetPath, {
         state: search ? { searchQuery: search } : undefined,

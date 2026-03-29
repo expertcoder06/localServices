@@ -35,7 +35,7 @@ export default function AdminDashboard() {
     };
 
     const fetchComplaints = async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('complaints')
         .select('*, jobs(title), consumers:user_id(name)')
         .order('created_at', { ascending: false });

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import ProviderScheduleBar from './ProviderScheduleBar'
 import { supabase } from '../utils/supabaseClient'
 
-export default function ServiceProviderProfile({ isEditable = false }) {
+export default function ServiceProviderProfile({ provider = null, isEditable = false }) {
   const [isSelfEditing, setIsSelfEditing] = useState(false)
   const [proData, setProData] = useState({
     businessName: 'Loading...',
