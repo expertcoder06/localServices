@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../utils/supabaseClient'
+import axios from 'axios'
 import AiBiddingSystem from '../components/AiBiddingSystem'
 import JobExecutionWallet from '../components/JobExecutionWallet'
 import '../App.css'
@@ -163,6 +164,9 @@ export default function ProviderDashboard() {
   const [providerBids, setProviderBids] = useState([])
   const [radius, setRadius] = useState(10) // 10km default
   const [providerLocation, setProviderLocation] = useState(null)
+  const [isLocating, setIsLocating] = useState(false)
+  const [locationError, setLocationError] = useState(null)
+  const [user, setUser] = useState(null)
   const [promisedHours, setPromisedHours] = useState(2) // Default 2 hours
 
   const haversineDistance = (lat1, lon1, lat2, lon2) => {
@@ -187,7 +191,7 @@ export default function ProviderDashboard() {
 
   useEffect(() => {
     const fetchJobs = async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('jobs')
         .select('*, consumers(name, photo_url)')
         .eq('status', 'pending')
@@ -245,7 +249,8 @@ export default function ProviderDashboard() {
     const fetchMyBids = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-         const { data, error } = await supabase
+         setUser(user);
+         const { data } = await supabase
            .from('bids')
            .select('*, job:jobs(*)')
            .eq('provider_id', user.id)
@@ -540,7 +545,7 @@ export default function ProviderDashboard() {
                             setIsLocating(false)
                             setLocationError(null)
                           },
-                          (err) => {
+                          () => {
                             setLocationError('Permission denied')
                             setIsLocating(false)
                           }
@@ -570,15 +575,15 @@ export default function ProviderDashboard() {
                       background: 'var(--primary-container)', padding: '2px 10px',
                       borderRadius: '100px',
                     }}>
-                      {searchRadius} km
+                      {radius} km
                     </span>
                   </div>
                   <input
                     type="range"
                     min="1"
                     max="50"
-                    value={searchRadius}
-                    onChange={e => setSearchRadius(parseInt(e.target.value))}
+                    value={radius}
+                    onChange={e => setRadius(parseInt(e.target.value))}
                     style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--primary)', height: '6px' }}
                   />
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--outline)', marginTop: '2px' }}>
@@ -597,7 +602,7 @@ export default function ProviderDashboard() {
                     fontSize: '0.72rem', color: 'var(--on-surface-variant)',
                   }}>
                     <span className="material-icons" style={{ fontSize: '0.85rem', color: '#3182ce' }}>filter_alt</span>
-                    Showing <strong style={{ color: 'var(--primary)' }}>{filteredRequests.length}</strong> request{filteredRequests.length !== 1 ? 's' : ''} within {searchRadius} km
+                    Showing <strong style={{ color: 'var(--primary)' }}>{visibleRequests.length}</strong> request{visibleRequests.length !== 1 ? 's' : ''} within {radius} km
                   </div>
                 )}
               </div>
@@ -1094,16 +1099,12 @@ export default function ProviderDashboard() {
                                        .eq('id', consumerId)
                                        .maybeSingle();
                                      if (consumerRow?.email) {
-                                       await fetch('http://localhost:5000/send-bid-placed', {
-                                         method: 'POST',
-                                         headers: { 'Content-Type': 'application/json' },
-                                         body: JSON.stringify({
+                                       await axios.post('http://localhost:5000/send-bid-placed', {
                                            customerEmail: consumerRow.email,
                                            customerName:  consumerRow.name || 'Customer',
                                            providerName,
                                            jobTitle:      selectedRequest.title || selectedRequest.service || 'your job',
                                            bidAmount:     currentBidPrice,
-                                         }),
                                        }).catch(e => console.warn('Email notification failed:', e));
                                      }
                                    }

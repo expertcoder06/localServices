@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../utils/supabaseClient'
 import JobExecutionWallet from './JobExecutionWallet'
+import axios from 'axios'
 
 // JOBS removed in favor of real database fetching
 
@@ -100,13 +101,9 @@ export default function AiBiddingSystem() {
       setSubmitted(prev => new Set([...prev, selectedJob.id]))
       
       // Call the email provider endpoint to start bid alerts for the customer
-      fetch('http://localhost:5000/start-bid-alert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      axios.post('http://localhost:5000/start-bid-alert', {
           jobId: selectedJob.id,
           jobTitle: selectedJob.title
-        })
       }).catch(err => console.warn('Bid alert failed:', err))
 
     } catch (err) {

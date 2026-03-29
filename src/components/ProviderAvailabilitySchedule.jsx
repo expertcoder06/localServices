@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../utils/supabaseClient'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -51,7 +51,7 @@ export default function ProviderAvailabilitySchedule() {
       if (!user) return
       setUserId(user.id)
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('service_providers')
         .select('availability_schedule')
         .eq('id', user.id)

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
 import { getCurrentLocation } from '../utils/locationService';
+import axios from 'axios';
 
 const Signup = () => {
   const [role, setRole] = useState(null); // 'consumer' | 'provider'
@@ -110,17 +111,14 @@ const Signup = () => {
     setServerOtp(generatedOtp);
     
     try {
-      const response = await fetch('http://localhost:5000/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, otp: generatedOtp })
-      });
+      const response = await axios.post('http://localhost:5000/send-otp', { email: formData.email, otp: generatedOtp });
       
-      if (!response.ok) {
+      if (response.status !== 200) {
         throw new Error("Failed to send verification email");
       }
       setStep(3); // Go to OTP verification step
     } catch (err) {
+      console.error("Email API Error:", err);
       setError("Could not connect to email server. Please ensure the backend is running.");
     } finally {
       setLoading(false);

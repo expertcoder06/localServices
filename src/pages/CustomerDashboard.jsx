@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../utils/supabaseClient'
 import { Link, useLocation } from 'react-router-dom'
 import '../App.css'
@@ -28,6 +28,7 @@ export default function CustomerDashboard() {
   // Sync search query when location state changes (e.g. chatbot navigation)
   useEffect(() => {
     if (navLocation.state?.searchQuery) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchQuery(navLocation.state.searchQuery)
       setActiveTab('dashboard')
     }
@@ -78,7 +79,6 @@ export default function CustomerDashboard() {
   ]
 
   const [professionals, setProfessionals] = useState([])
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchProfessionals() {
@@ -103,7 +103,6 @@ export default function CustomerDashboard() {
         }))
         setProfessionals(mapped)
       }
-      setLoading(false)
     }
     fetchProfessionals()
   }, [])

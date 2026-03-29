@@ -182,7 +182,7 @@ export default function AdminDashboard() {
           </>
         )
 
-      case 'users':
+      case 'users': {
         const filteredUsers = allUsers.filter(u => u.id.toLowerCase().includes(searchUserId.toLowerCase()) || (u.name && u.name.toLowerCase().includes(searchUserId.toLowerCase())));
         return (
           <>
@@ -253,6 +253,7 @@ export default function AdminDashboard() {
             </div>
           </>
         )
+      }
 
       case 'reports':
         return (

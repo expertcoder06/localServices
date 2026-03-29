@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
-
+import axios from 'axios';
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -72,14 +72,9 @@ const Login = () => {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(code);
 
-      const response = await fetch('http://localhost:5000/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp: code }),
-      });
-
-      const result = await response.json();
-      if (!result.success) throw new Error(result.message);
+      const response = await axios.post('http://localhost:5000/send-otp', { email, otp: code });
+      
+      if (!response.data.success) throw new Error(response.data.message);
 
       setOtpStep(2);
     } catch (err) {

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as faceapi from 'face-api.js';
 import { Camera, RefreshCw, CheckCircle, AlertCircle, UserCheck } from 'lucide-react';
-import { loadModels, detectFace, isBlinking, isSmiling, checkHeadMovement } from '../utils/faceService';
+import { loadModels, isBlinking, isSmiling, checkHeadMovement } from '../utils/faceService';
 
 const FaceVerification = ({ onVerified, onCancel }) => {
     const videoRef = useRef(null);
@@ -16,17 +16,6 @@ const FaceVerification = ({ onVerified, onCancel }) => {
     const [attempts, setAttempts] = useState(0);
     const maxAttempts = 3;
     const initialNoseX = useRef(null);
-
-    useEffect(() => {
-        const initModels = async () => {
-            await loadModels();
-            setStatus('ready');
-            setPrompt('Allow camera access to start verification');
-            startVideo();
-        };
-        initModels();
-        return () => stopVideo();
-    }, []);
 
     const startVideo = async () => {
         try {
@@ -47,6 +36,17 @@ const FaceVerification = ({ onVerified, onCancel }) => {
             videoRef.current.srcObject.getTracks().forEach(track => track.stop());
         }
     };
+
+    useEffect(() => {
+        const initModels = async () => {
+            await loadModels();
+            setStatus('ready');
+            setPrompt('Allow camera access to start verification');
+            startVideo();
+        };
+        initModels();
+        return () => stopVideo();
+    }, []);
 
     const handleVerify = async () => {
         if (status !== 'ready') return;
