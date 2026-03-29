@@ -3,7 +3,7 @@ import { supabase } from '../utils/supabaseClient'
 import ServiceProviderProfile from './ServiceProviderProfile'
 import axios from 'axios'
 
-const EMAIL_SERVER = 'http://localhost:5000'
+const EMAIL_SERVER = 'https://api-node-emailverification.onrender.com'
 
 // ── Email helper: bid accepted → provider gets congratulations email
 async function sendBidAcceptedEmail({ providerEmail, providerName, jobTitle, customerName, amount }) {
