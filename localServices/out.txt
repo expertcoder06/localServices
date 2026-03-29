@@ -1,0 +1,10 @@
+[dotenv@17.3.1] injecting env (5) from .env -- tip: 🛡️ auth for agents: https://vestauth.com
+bids data: {
+  "id": "6010daa4-7343-4c9a-8e12-700282d193ab",
+  "job_id": "e5113155-7e4f-44ca-bbc5-a3ad004e31c9",
+  "provider_id": "5ccc14eb-745b-4821-8bcc-f8e4a0ff0f8a",
+  "amount": 1000,
+  "message": null,
+  "status": "pending",
+  "created_at": "2026-03-27T16:42:52.412905+00:00"
+}

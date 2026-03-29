@@ -1,0 +1,13 @@
+
+> localservices@0.0.0 build
+> vite build
+
+[36mvite v8.0.3 [32mbuilding client environment for production...[36m[39m
+[2Ktransforming...✓ 99 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   3.60 kB │ gzip:   1.23 kB
+dist/assets/index-C1k0EQ2f.css   26.18 kB │ gzip:   5.26 kB
+dist/assets/index-DBikINFV.js   844.70 kB │ gzip: 234.39 kB
+
+[32m✓ built in 698ms[39m
