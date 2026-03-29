@@ -26,6 +26,11 @@ export default function CustomerDashboard() {
   const [filterTimeTo, setFilterTimeTo] = useState('')
   const [showAvailFilter, setShowAvailFilter] = useState(false)
 
+  const [rating, setRating] = useState(0)
+  const [hoverRating, setHoverRating] = useState(0)
+  const [showPostRequest, setShowPostRequest] = useState(false)
+  const [postRequestInitialData, setPostRequestInitialData] = useState(null)
+
   // Sync tab and search query from location state
   useEffect(() => {
     if (navLocation.state?.activeTab) {
@@ -41,11 +46,6 @@ export default function CustomerDashboard() {
       setShowPostRequest(true)
     }
   }, [navLocation.state, navLocation.key])
-
-  const [rating, setRating] = useState(0)
-  const [hoverRating, setHoverRating] = useState(0)
-  const [showPostRequest, setShowPostRequest] = useState(false)
-  const [postRequestInitialData, setPostRequestInitialData] = useState(null)
   const [userName, setUserName] = useState('User')
   const [userInitials, setUserInitials] = useState('U')
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)

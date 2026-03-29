@@ -13,15 +13,11 @@ const MILESTONES = [
 export default function CurrentWork({ type = 'customer' }) {
   const [activeJob, setActiveJob] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [showComplaint, setShowComplaint] = useState(false)
   const [complaintType, setComplaintType] = useState('other')
   const [complaintText, setComplaintText] = useState('')
   const [isDelayed, setIsDelayed] = useState(false)
   const [viewProfileProvider, setViewProfileProvider] = useState(null)
-  
-  // Media states for complaint
-  const [issuePhoto, setIssuePhoto] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
   const [issueAudio, setIssueAudio] = useState(null)
   const [isRecording, setIsRecording] = useState(false) // Simulation
@@ -60,7 +56,6 @@ export default function CurrentWork({ type = 'customer' }) {
       }
     } catch (err) {
       console.error('Error fetching active job:', err)
-      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -131,10 +126,10 @@ export default function CurrentWork({ type = 'customer' }) {
       setShowComplaint(false)
       setComplaintText('')
       setComplaintType('other')
-      setIssuePhoto(null)
       setPhotoPreview(null)
       setIssueAudio(null)
     } catch (err) {
+      console.error('Failed to submit report:', err)
       alert('Failed to submit report: ' + err.message)
     }
   }
@@ -142,7 +137,6 @@ export default function CurrentWork({ type = 'customer' }) {
   const handlePhotoChange = (e) => {
     const file = e.target.files[0]
     if (file) {
-      setIssuePhoto(file)
       const reader = new FileReader()
       reader.onloadend = () => setPhotoPreview(reader.result)
       reader.readAsDataURL(file)

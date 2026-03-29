@@ -15,7 +15,7 @@ async function sendBidAcceptedEmail({ providerEmail, providerName, jobTitle, cus
   }
 }
 
-export default function CustomerJobsFlow() {
+export default function CustomerJobsFlow({ onAcceptSuccess }) {
   const [view, setView] = useState('job_list')
   const [selectedBid, setSelectedBid] = useState(null)
   const [jobs, setJobs] = useState([])
@@ -24,7 +24,7 @@ export default function CustomerJobsFlow() {
   const [user, setUser] = useState(null)
   const [customerName, setCustomerName] = useState('Customer')
   const [selectedJob, setSelectedJob] = useState(null)
-  const [bidCounts, setBidCounts] = useState({})
+
   const [viewProfileProvider, setViewProfileProvider] = useState(null)
 
   useEffect(() => {
@@ -70,19 +70,14 @@ export default function CustomerJobsFlow() {
           .select('job_id')
           .in('job_id', jobsData.map(j => j.id))
 
-        if (countsError) throw countsError
-        
-        // Convert to counts
-        const curCounts = {}
-        if (countsData) {
-            countsData.forEach(c => curCounts[c.job_id] = (curCounts[c.job_id] || 0) + 1)
-        }
-        setBidCounts(curCounts)
+        if (bidsErr) throw bidsErr
+
+        // Note: bid counts calculated but not used in UI
 
         const activeJob = jobsData[0]
 
         // 3. Start bid reminder emails if bids exist and job is still pending
-        if (countsData && countsData.length > 0 && activeJob.status === 'pending') {
+        if (bidsData && bidsData.length > 0 && activeJob.status === 'pending') {
           const { data: consumer } = await supabase
             .from('consumers')
             .select('email, name')
@@ -139,16 +134,7 @@ export default function CustomerJobsFlow() {
         const jobId = payload.new?.job_id || payload.old?.job_id
         if (!jobId) return
 
-        // Update bid counts
-        setBidCounts(prev => {
-          const newCounts = { ...prev }
-          if (payload.eventType === 'INSERT') {
-            newCounts[jobId] = (newCounts[jobId] || 0) + 1
-          } else if (payload.eventType === 'DELETE') {
-            newCounts[jobId] = Math.max(0, (newCounts[jobId] || 1) - 1)
-          }
-          return newCounts
-        })
+
         
         // Refresh detailed bids if it's the active job
         const activeJob = selectedJob || (jobs.length > 0 ? jobs[0] : null)

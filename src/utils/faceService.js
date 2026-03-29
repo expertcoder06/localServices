@@ -11,7 +11,6 @@ export const loadModels = async () => {
             faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
             faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
         ]);
-        console.log("Face-api models loaded.");
     } catch (error) {
         console.error("Error loading face-api models:", error);
     }
