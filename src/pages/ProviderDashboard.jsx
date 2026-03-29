@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../utils/supabaseClient'
+import axios from 'axios'
 import AiBiddingSystem from '../components/AiBiddingSystem'
 import JobExecutionWallet from '../components/JobExecutionWallet'
 import '../App.css'
@@ -199,6 +200,9 @@ export default function ProviderDashboard() {
   const [providerBids, setProviderBids] = useState([])
   const [radius, setRadius] = useState(10) // 10km default
   const [providerLocation, setProviderLocation] = useState(null)
+  const [isLocating, setIsLocating] = useState(false)
+  const [locationError, setLocationError] = useState(null)
+  const [user, setUser] = useState(null)
   const [promisedHours, setPromisedHours] = useState(2) // Default 2 hours
   const [isLocating, setIsLocating] = useState(false)
   const [locationError, setLocationError] = useState(null)
@@ -251,13 +255,12 @@ export default function ProviderDashboard() {
   }
 
   useEffect(() => {
-    fetchProviderLocation();
-    const locInterval = setInterval(() => {
-      console.log('Background Location Sync (5-min)');
-      fetchProviderLocation();
-    }, 5 * 60 * 1000); 
-    return () => clearInterval(locInterval);
-  }, []);
+    const fetchJobs = async () => {
+      const { data } = await supabase
+        .from('jobs')
+        .select('*, consumers(name, photo_url)')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
 
   useEffect(() => {
     const init = async () => {
@@ -332,21 +335,20 @@ export default function ProviderDashboard() {
         }
       };
 
-      const fetchActiveJob = async () => {
-        if (!authUser) return;
-        const { data } = await supabase
-          .from('jobs')
-          .select('*')
-          .eq('accepted_provider_id', authUser.id)
-          .in('status', ['accepted', 'in_progress'])
-          .maybeSingle();
-        if (data) setActiveJob(data);
-      };
-
-      fetchJobs();
-      fetchMyBids();
-      fetchActiveJob();
-      fetchProviderLocation();
+    const fetchMyBids = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+         setUser(user);
+         const { data } = await supabase
+           .from('bids')
+           .select('*, job:jobs(*)')
+           .eq('provider_id', user.id)
+           .order('created_at', { ascending: false });
+         if (data) {
+           setProviderBids(data);
+           setAcceptedJobs(prev => new Set([...prev, ...data.map(b => b.job_id)]));
+         }
+      }
     };
 
     init();
@@ -650,14 +652,23 @@ export default function ProviderDashboard() {
                       <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Detecting Location...</span>
                     </div>
                   </div>
-                ) : !providerLocation ? (
-                  <div style={{ textAlign: 'center', padding: '1.2rem 0' }}>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--on-surface-variant)', marginBottom: '1rem' }}>
-                      Enable location to filter jobs by distance.
-                    </p>
-                    <button 
-                      onClick={fetchProviderLocation}
-                      style={{ 
+                  {!providerLocation && !isLocating && (
+                    <button
+                      onClick={() => {
+                        setIsLocating(true)
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
+                            setProviderLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+                            setIsLocating(false)
+                            setLocationError(null)
+                          },
+                          () => {
+                            setLocationError('Permission denied')
+                            setIsLocating(false)
+                          }
+                        )
+                      }}
+                      style={{
                         background: 'var(--primary)', color: 'white', border: 'none',
                         borderRadius: 'var(--radius-md)', padding: '0.6rem 1.5rem',
                         fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer',
@@ -667,6 +678,35 @@ export default function ProviderDashboard() {
                       <span className="material-icons" style={{ fontSize: '1.1rem' }}>my_location</span>
                       Enable Location
                     </button>
+                  )}
+                </div>
+
+                {/* Radius Slider */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Search Radius
+                    </label>
+                    <span style={{
+                      fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)',
+                      background: 'var(--primary-container)', padding: '2px 10px',
+                      borderRadius: '100px',
+                    }}>
+                      {radius} km
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    value={radius}
+                    onChange={e => setRadius(parseInt(e.target.value))}
+                    style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--primary)', height: '6px' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--outline)', marginTop: '2px' }}>
+                    <span>1 km</span>
+                    <span>25 km</span>
+                    <span>50 km</span>
                   </div>
                 ) : (
                   <>
@@ -715,46 +755,17 @@ export default function ProviderDashboard() {
                       )}
                     </div>
 
-                    {/* Radius Slider */}
-                    <div style={{ padding: '0 0.5rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--on-surface)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Search Radius
-                        </label>
-                        <div style={{
-                          fontSize: '0.9rem', fontWeight: 900, color: 'var(--primary)',
-                          background: 'var(--primary-container)', padding: '2px 12px',
-                          borderRadius: '100px', border: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)'
-                        }}>
-                          {radius} km
-                        </div>
-                      </div>
-                      <input
-                        type="range" min="1" max="50" value={radius}
-                        onChange={e => setRadius(parseInt(e.target.value))}
-                        className="radius-slider"
-                      />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--on-surface-variant)', marginTop: '0.5rem', fontWeight: 600 }}>
-                        <span>1 km</span>
-                        <span>25 km</span>
-                        <span>50 km</span>
-                      </div>
-                    </div>
-
-                    {/* Filter summary */}
-                    {providerLocation && (
-                      <div style={{
-                        marginTop: '1.2rem', paddingTop: '1rem',
-                        borderTop: '1px solid var(--outline-variant)',
-                        display: 'flex', alignItems: 'center', gap: '0.6rem',
-                        fontSize: '0.75rem', color: 'var(--on-surface-variant)',
-                        fontWeight: 500
-                      }}>
-                        <span className="material-icons" style={{ fontSize: '1rem', color: 'var(--primary)' }}>explore</span>
-                        Found <strong style={{ color: 'var(--on-surface)' }}>{visibleRequests.length}</strong> jobs within your area.
-                      </div>
-                    )}
-                  </>
+                {/* Filter summary */}
+                {providerLocation && (
+                  <div style={{
+                    marginTop: '0.6rem', paddingTop: '0.6rem',
+                    borderTop: '1px solid var(--outline-variant)',
+                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    fontSize: '0.72rem', color: 'var(--on-surface-variant)',
+                  }}>
+                    <span className="material-icons" style={{ fontSize: '0.85rem', color: '#3182ce' }}>filter_alt</span>
+                    Showing <strong style={{ color: 'var(--primary)' }}>{visibleRequests.length}</strong> request{visibleRequests.length !== 1 ? 's' : ''} within {radius} km
+                  </div>
                 )}
               </div>
 
@@ -1142,16 +1153,12 @@ export default function ProviderDashboard() {
                                        .eq('id', consumerId)
                                        .maybeSingle();
                                      if (consumerRow?.email) {
-                                       await fetch('http://localhost:5000/send-bid-placed', {
-                                         method: 'POST',
-                                         headers: { 'Content-Type': 'application/json' },
-                                         body: JSON.stringify({
+                                       await axios.post('http://localhost:5000/send-bid-placed', {
                                            customerEmail: consumerRow.email,
                                            customerName:  consumerRow.name || 'Customer',
                                            providerName,
                                            jobTitle:      selectedRequest.title || selectedRequest.service || 'your job',
                                            bidAmount:     currentBidPrice,
-                                         }),
                                        }).catch(e => console.warn('Email notification failed:', e));
                                      }
                                    }

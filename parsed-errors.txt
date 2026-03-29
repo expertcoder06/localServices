@@ -1,0 +1,169 @@
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\db-check.js
+  5: no-undef - 'process' is not defined.
+  5: no-undef - 'process' is not defined.
+
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\oldFlow.jsx
+  1: null - Parsing error: Unexpected character '∩┐╜'
+
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\src\components\CustomerJobsFlow.jsx
+  20: no-unused-vars - 'sendBidPlacedEmail' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.
+  30: no-unused-vars - 'navigate' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  33: no-unused-vars - 'feedbackText' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  33: no-unused-vars - 'setFeedbackText' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  34: no-unused-vars - 'rating' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  34: no-unused-vars - 'setRating' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  35: no-unused-vars - 'emailSent' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  35: no-unused-vars - 'setEmailSent' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  41: no-unused-vars - 'customerEmail' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  87: no-unused-vars - 'countsData' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  87: no-unused-vars - 'countsError' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  92: no-undef - 'bidsError' is not defined.
+  92: no-undef - 'bidsError' is not defined.
+  93: no-undef - 'bidsData' is not defined.
+  96: no-undef - 'bidsData' is not defined.
+  96: no-undef - 'bidsData' is not defined.
+  96: no-undef - 'jobData' is not defined.
+  104: no-undef - 'jobData' is not defined.
+  107: no-undef - 'jobData' is not defined.
+  110: no-undef - 'jobData' is not defined.
+  575: no-undef - 'job' is not defined.
+  575: no-undef - 'job' is not defined.
+  580: no-undef - 'job' is not defined.
+  595: no-undef - 'job' is not defined.
+  597: no-undef - 'job' is not defined.
+  605: no-undef - 'job' is not defined.
+  606: no-undef - 'job' is not defined.
+  609: no-undef - 'job' is not defined.
+  631: no-undef - 'job' is not defined.
+  638: no-undef - 'job' is not defined.
+  654: no-undef - 'job' is not defined.
+  664: no-undef - 'job' is not defined.
+  664: no-undef - 'job' is not defined.
+
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\src\components\FaceVerification.jsx
+  4: no-unused-vars - 'detectFace' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.
+  25: react-hooks/immutability - Error: Cannot access variable before it is declared
+
+`startVideo` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  23 |             setStatus('ready');
+  24 |             setPrompt('Allow camera access to start verification');
+> 25 |             startVideo();
+     |             ^^^^^^^^^^ `startVideo` accessed before it is declared
+  26 |         };
+  27 |         initModels();
+  28 |         return () => stopVideo();
+
+  29 |     }, []);
+  30 |
+> 31 |     const startVideo = async () => {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 32 |         try {
+     | ^^^^^^^^^^^^^
+> 33 |             const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+     ΓÇª
+     | ^^^^^^^^^^^^^
+> 42 |         }
+     | ^^^^^^^^^^^^^
+> 43 |     };
+     | ^^^^^^^ `startVideo` is declared here
+  44 |
+  45 |     const stopVideo = () => {
+  46 |         if (videoRef.current && videoRef.current.srcObject) {
+  28: react-hooks/immutability - Error: Cannot access variable before it is declared
+
+`stopVideo` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  26 |         };
+  27 |         initModels();
+> 28 |         return () => stopVideo();
+     |                      ^^^^^^^^^ `stopVideo` accessed before it is declared
+  29 |     }, []);
+  30 |
+  31 |     const startVideo = async () => {
+
+  43 |     };
+  44 |
+> 45 |     const stopVideo = () => {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 46 |         if (videoRef.current && videoRef.current.srcObject) {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 47 |             videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 48 |         }
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 49 |     };
+     | ^^^^^^^ `stopVideo` is declared here
+  50 |
+  51 |     const handleVerify = async () => {
+  52 |         if (status !== 'ready') return;
+
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\src\components\PostRequestFlow.jsx
+  428: no-undef - 'isPlaying' is not defined.
+  430: no-undef - 'isPlaying' is not defined.
+  430: no-undef - 'isPlaying' is not defined.
+  431: no-undef - 'isPlaying' is not defined.
+
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\src\components\ProviderAvailabilitySchedule.jsx
+  1: no-unused-vars - 'useCallback' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.
+  54: no-unused-vars - 'error' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\src\components\ServiceProviderProfile.jsx
+  4: no-unused-vars - 'provider' is assigned a value but never used.
+  19: no-undef - 'useEffect' is not defined.
+  21: no-undef - 'supabase' is not defined.
+  24: no-undef - 'supabase' is not defined.
+  72: no-undef - 'supabase' is not defined.
+  83: no-undef - 'supabase' is not defined.
+
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\src\components\UserProfile.jsx
+  29: no-unused-vars - 'error' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\src\pages\AdminDashboard.jsx
+  186: no-case-declarations - Unexpected lexical declaration in case block.
+
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\src\pages\CustomerDashboard.jsx
+  1: no-unused-vars - 'useMemo' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.
+  31: react-hooks/set-state-in-effect - Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  29 |   useEffect(() => {
+  30 |     if (navLocation.state?.searchQuery) {
+> 31 |       setSearchQuery(navLocation.state.searchQuery)
+     |       ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  32 |       setActiveTab('dashboard')
+  33 |     }
+  34 |   }, [navLocation.state?.searchQuery, navLocation.key])
+  81: no-unused-vars - 'loading' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\src\pages\ProviderDashboard.jsx
+  191: no-unused-vars - 'error' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  249: no-unused-vars - 'error' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+  439: no-undef - 'user' is not defined.
+  512: no-undef - 'isLocating' is not defined.
+  517: no-undef - 'isLocating' is not defined.
+  518: no-undef - 'isLocating' is not defined.
+  520: no-undef - 'isLocating' is not defined.
+  525: no-undef - 'isLocating' is not defined.
+  530: no-undef - 'locationError' is not defined.
+  534: no-undef - 'isLocating' is not defined.
+  537: no-undef - 'setIsLocating' is not defined.
+  541: no-undef - 'setIsLocating' is not defined.
+  542: no-undef - 'setLocationError' is not defined.
+  544: no-unused-vars - 'err' is defined but never used.
+  545: no-undef - 'setLocationError' is not defined.
+  546: no-undef - 'setIsLocating' is not defined.
+  574: no-undef - 'searchRadius' is not defined.
+  581: no-undef - 'searchRadius' is not defined.
+  582: no-undef - 'setSearchRadius' is not defined.
+  601: no-undef - 'filteredRequests' is not defined.
+  601: no-undef - 'filteredRequests' is not defined.
+  601: no-undef - 'searchRadius' is not defined.
+
+C:\Users\Hp\OneDrive\Desktop\Frosthack\localServices\src\pages\Signup.jsx
+  120: no-unused-vars - 'err' is defined but never used.

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../utils/supabaseClient'
 import { Link, useLocation } from 'react-router-dom'
 import '../App.css'
@@ -32,6 +32,7 @@ export default function CustomerDashboard() {
       setActiveTab(navLocation.state.activeTab)
     }
     if (navLocation.state?.searchQuery) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchQuery(navLocation.state.searchQuery)
       if (!navLocation.state.activeTab) setActiveTab('dashboard')
     }
@@ -124,7 +125,6 @@ export default function CustomerDashboard() {
   ]
 
   const [professionals, setProfessionals] = useState([])
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchProfessionals() {
@@ -149,7 +149,6 @@ export default function CustomerDashboard() {
         }))
         setProfessionals(mapped)
       }
-      setLoading(false)
     }
     fetchProfessionals()
   }, [])

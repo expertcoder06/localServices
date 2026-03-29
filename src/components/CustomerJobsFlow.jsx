@@ -1,51 +1,28 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../utils/supabaseClient'
 import ServiceProviderProfile from './ServiceProviderProfile'
+import axios from 'axios'
 
 const EMAIL_SERVER = 'http://localhost:5000'
 
 // ── Email helper: bid accepted → provider gets congratulations email
 async function sendBidAcceptedEmail({ providerEmail, providerName, jobTitle, customerName, amount }) {
   try {
-    const res = await fetch(`${EMAIL_SERVER}/send-bid-accepted`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ providerEmail, providerName, jobTitle, customerName, amount }),
-    })
-    if (!res.ok) console.warn('Bid-accepted email server responded:', res.status)
+    const res = await axios.post(`${EMAIL_SERVER}/send-bid-accepted`, { providerEmail, providerName, jobTitle, customerName, amount })
+    if (res.status !== 200) console.warn('Bid-accepted email server responded:', res.status)
   } catch (err) {
     console.error('Failed to send bid-accepted email:', err)
   }
 }
 
-// ── Email helper: bid placed → customer gets notification email
-async function sendBidPlacedEmail({ customerEmail, customerName, providerName, jobTitle, bidAmount }) {
-  try {
-    const res = await fetch(`${EMAIL_SERVER}/send-bid-placed`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customerEmail, customerName, providerName, jobTitle, bidAmount }),
-    })
-    if (!res.ok) console.warn('Bid-placed email server responded:', res.status)
-  } catch (err) {
-    console.error('Failed to send bid-placed email:', err)
-  }
-}
-
-export default function CustomerJobsFlow({ onAcceptSuccess }) {
-  const navigate = useNavigate()
+export default function CustomerJobsFlow() {
   const [view, setView] = useState('job_list')
   const [selectedBid, setSelectedBid] = useState(null)
-  const [feedbackText, setFeedbackText] = useState('')
-  const [rating, setRating] = useState(4)
-  const [emailSent, setEmailSent] = useState(false)
   const [jobs, setJobs] = useState([])
   const [bids, setBids] = useState([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const [customerName, setCustomerName] = useState('Customer')
-  const [customerEmail, setCustomerEmail] = useState('')
   const [selectedJob, setSelectedJob] = useState(null)
   const [bidCounts, setBidCounts] = useState({})
   const [viewProfileProvider, setViewProfileProvider] = useState(null)
@@ -63,8 +40,6 @@ export default function CustomerJobsFlow({ onAcceptSuccess }) {
           .eq('id', authUser.id)
           .maybeSingle()
         if (consumerData?.name) setCustomerName(consumerData.name)
-        // Store auth email for sending
-        setCustomerEmail(authUser.email || '')
         fetchJobAndBids(authUser.id)
       } else {
         setLoading(false)
@@ -95,11 +70,33 @@ export default function CustomerJobsFlow({ onAcceptSuccess }) {
           .select('job_id')
           .in('job_id', jobsData.map(j => j.id))
 
-        if (!bidsErr && bidsData) {
-          const counts = {}
-          bidsData.forEach(b => counts[b.job_id] = (counts[b.job_id] || 0) + 1)
-          setBidCounts(counts)
+        if (countsError) throw countsError
+        
+        // Convert to counts
+        const curCounts = {}
+        if (countsData) {
+            countsData.forEach(c => curCounts[c.job_id] = (curCounts[c.job_id] || 0) + 1)
         }
+        setBidCounts(curCounts)
+
+        const activeJob = jobsData[0]
+
+        // 3. Start bid reminder emails if bids exist and job is still pending
+        if (countsData && countsData.length > 0 && activeJob.status === 'pending') {
+          const { data: consumer } = await supabase
+            .from('consumers')
+            .select('email, name')
+            .eq('id', userId)
+            .single()
+
+          axios.post('http://localhost:5000/start-bid-alert', {
+              jobId: activeJob.id,
+              consumerEmail: consumer?.email,
+              consumerName: consumer?.name,
+              jobTitle: activeJob.title,
+          }).catch(err => console.warn('Bid alert start failed:', err))
+        }
+        return activeJob
       }
     } catch (err) {
       console.error('Error fetching jobs/bids:', err)
@@ -429,6 +426,7 @@ export default function CustomerJobsFlow({ onAcceptSuccess }) {
   }
 
   if (view === 'tracking') {
+    const job = selectedJob || jobs[0]
     const isOverdue = job?.promised_completion_at && new Date() > new Date(job.promised_completion_at)
     
     const handleReleasePayment = async () => {

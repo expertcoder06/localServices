@@ -26,7 +26,7 @@ export default function UserProfile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         // Fetch from consumers table
-        const { data: consumer, error } = await supabase
+        const { data: consumer } = await supabase
           .from('consumers')
           .select('*')
           .eq('id', user.id)
